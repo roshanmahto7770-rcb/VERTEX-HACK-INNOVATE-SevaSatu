@@ -21,7 +21,7 @@ import {
   Navigation,
 } from 'lucide-react';
 import { GeminiTriageOutput, Grievance, MasterComplaint } from '@/lib/types';
-import { getSavedProfile, UserProfile } from '@/components/landing/UserProfileModal';
+import { getSavedProfile, UserProfile, formatAddress } from '@/components/landing/UserProfileModal';
 
 interface SubmitComplaintModalProps {
   isOpen: boolean;
@@ -93,8 +93,8 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
   const [citizenName, setCitizenName] = useState('');
   const [citizenPhone, setCitizenPhone] = useState('');
 
-  // ── User's own saved address (from profile) ────────────────────────────────
-  const [userAddress, setUserAddress] = useState('');
+  // ── User's own saved address (from profile — structured) ─────────────────
+  const [userAddress, setUserAddress] = useState('');  // formatted display string
 
   // ── Complaint location (where the issue actually is) ───────────────────────
   const [complaintAddress, setComplaintAddress] = useState('');
@@ -137,7 +137,8 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
       if (profile) {
         setCitizenName(profile.name);
         setCitizenPhone(profile.phone);
-        setUserAddress(profile.savedAddress);
+        // Build formatted display string from structured address
+        setUserAddress(profile.address ? formatAddress(profile.address) : '');
       } else {
         setCitizenName('');
         setCitizenPhone('');
@@ -268,7 +269,7 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      setErrorMsg('Please fill in all mandatory fields marked with a red star (*).');
+      setErrorMsg('Please fill in all fields marked with * before submitting.');
       return;
     }
 
@@ -389,10 +390,6 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
           ═══════════════════════════════════════════════════════════════════ */}
           {!result && !isFinalSuccess && (
             <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Mandatory Notice */}
-              <div className="text-[11px] text-gray-500 flex items-center gap-1">
-                Fields marked with <span className="text-red-500 font-bold text-sm leading-none">*</span> are mandatory.
-              </div>
 
               {/* ── CITIZEN IDENTITY (pre-filled from profile) ─────────────── */}
               <div className="p-4 bg-slate-50 border border-gray-200 rounded-2xl space-y-3">
@@ -447,24 +444,44 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                   </div>
                 </div>
 
-                {/* User's Saved Home Address */}
+                {/* User's Saved Home Address — structured read-only display */}
                 <div>
-                  <label className="block text-[10px] font-semibold text-gray-500 mb-1 uppercase tracking-wider flex items-center gap-1">
+                  <label className="block text-[10px] font-semibold text-gray-500 mb-1.5 uppercase tracking-wider flex items-center gap-1">
                     <Home className="w-3 h-3" />
                     Your Home / Office Address
-                    <span className="text-gray-400 font-normal">(optional, for officer contact)</span>
+                    <span className="text-gray-400 font-normal">(for officer contact)</span>
                   </label>
-                  <input
-                    type="text"
-                    value={userAddress}
-                    onChange={(e) => setUserAddress(e.target.value)}
-                    placeholder="e.g., 42-B, Lajpat Nagar, New Delhi"
-                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
-                  />
-                  {savedProfile && (
-                    <p className="text-[10px] text-emerald-600 font-semibold mt-1">
-                      ✓ Auto-filled from your saved profile
-                    </p>
+
+                  {savedProfile && savedProfile.address ? (
+                    // Structured address pill-grid from saved profile
+                    <div className="bg-white border border-gray-200 rounded-xl p-3 space-y-2">
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                        {savedProfile.address.houseNo && (
+                          <div><span className="text-gray-400">House/Flat: </span><span className="font-semibold text-gray-800">{savedProfile.address.houseNo}</span></div>
+                        )}
+                        {savedProfile.address.building && (
+                          <div><span className="text-gray-400">Building: </span><span className="font-semibold text-gray-800">{savedProfile.address.building}</span></div>
+                        )}
+                        {savedProfile.address.street && (
+                          <div className="col-span-2"><span className="text-gray-400">Street: </span><span className="font-semibold text-gray-800">{savedProfile.address.street}</span></div>
+                        )}
+                        <div><span className="text-gray-400">City: </span><span className="font-semibold text-gray-800">{savedProfile.address.city}</span></div>
+                        <div><span className="text-gray-400">State: </span><span className="font-semibold text-gray-800">{savedProfile.address.state}</span></div>
+                        <div><span className="text-gray-400">Pincode: </span><span className="font-semibold text-gray-800 font-mono">{savedProfile.address.pincode}</span></div>
+                      </div>
+                      <p className="text-[10px] text-emerald-600 font-semibold border-t border-gray-100 pt-1.5">
+                        ✓ Auto-filled from your saved profile
+                      </p>
+                    </div>
+                  ) : (
+                    // Fallback plain input when no profile set
+                    <input
+                      type="text"
+                      value={userAddress}
+                      onChange={(e) => setUserAddress(e.target.value)}
+                      placeholder="e.g., 42-B, Lajpat Nagar, New Delhi 110024"
+                      className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+                    />
                   )}
                 </div>
               </div>
