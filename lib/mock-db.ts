@@ -282,6 +282,12 @@ class MockDatabase {
       status: 'In_Progress',
       isValidGrievance: true,
       summary: 'Water leakage on road from cracked supply line.',
+      recommendedAction: 'Shut isolation valve and clamp broken segment.',
+      officerComment: 'Valve team deployed to stem pressure.',
+      createdAt: '2025-05-16T07:20:00.000Z',
+      updatedAt: '2025-05-16T07:35:00.000Z',
+    };
+
     // 9. #C-8891: AI Triaged - Pending Officer Assignment (Exposed Wire)
     const g6: Grievance = {
       id: 'c-8891',
