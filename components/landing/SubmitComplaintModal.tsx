@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import {
   X,
   Camera,
@@ -13,7 +14,9 @@ import {
   Loader2,
   RefreshCw,
   Layers,
-  ArrowRight,
+  ArrowLeft,
+  LayoutDashboard,
+  FileCheck,
 } from 'lucide-react';
 import { GeminiTriageOutput, Grievance, MasterComplaint } from '@/lib/types';
 
@@ -23,7 +26,7 @@ interface SubmitComplaintModalProps {
   onSuccess?: (grievance: Grievance, masterTicket: MasterComplaint | null) => void;
 }
 
-// Preset real-world civic issue presets for instant testing
+// Preset real-world civic issue presets for 1-click testing
 const SAMPLE_PRESETS = [
   {
     name: 'Road Pothole (MG Road)',
@@ -36,7 +39,7 @@ const SAMPLE_PRESETS = [
     image: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=600&auto=format&fit=crop&q=80',
   },
   {
-    name: 'Duplicate Pothole Check (MG Road < 50m)',
+    name: 'Duplicate Pothole Check (< 50m)',
     title: 'Broken road in front of my house',
     desc: 'Very dangerous pothole at MG road, cars are swerving into oncoming traffic.',
     category: 'Road Damage',
@@ -72,7 +75,6 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const [activeTab, setActiveTab] = useState<'text' | 'voice' | 'camera'>('text');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [addressText, setAddressText] = useState('MG Road, Delhi');
@@ -80,11 +82,17 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
   const [longitude, setLongitude] = useState(77.2177);
   const [citizenPhone, setCitizenPhone] = useState('+91 98765 43210');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  
+
+  // Field validation errors
+  const [errors, setErrors] = useState<{
+    title?: string;
+    description?: string;
+    image?: string;
+  }>({});
+
   // Voice recording state
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
-  const [voiceTranscript, setVoiceTranscript] = useState('');
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Submission & AI analysis state
@@ -100,7 +108,23 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
   } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  if (!isOpen) return null;
+  // Reset form completely
+  const handleResetForm = () => {
+    setTitle('');
+    setDescription('');
+    setSelectedImage(null);
+    setErrors({});
+    setErrorMsg(null);
+    setResult(null);
+    setIsRecording(false);
+    if (timerRef.current) clearInterval(timerRef.current);
+  };
+
+  // When modal closes, reset so reopening starts fresh
+  const handleCloseModal = () => {
+    handleResetForm();
+    onClose();
+  };
 
   // Simulate or execute Geolocation
   const handleDetectLocation = () => {
@@ -109,10 +133,11 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
         (pos) => {
           setLatitude(Number(pos.coords.latitude.toFixed(4)));
           setLongitude(Number(pos.coords.longitude.toFixed(4)));
-          setAddressText(`Detected GPS: Lat ${pos.coords.latitude.toFixed(4)}, Long ${pos.coords.longitude.toFixed(4)}`);
+          setAddressText(
+            `Detected GPS: Lat ${pos.coords.latitude.toFixed(4)}, Long ${pos.coords.longitude.toFixed(4)}`
+          );
         },
         () => {
-          // Default fallback
           setLatitude(28.6304);
           setLongitude(77.2177);
           setAddressText('MG Road, Delhi (Lat: 28.6304, Long: 77.2177)');
@@ -130,12 +155,13 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
         setRecordingSeconds((prev) => prev + 1);
       }, 1000);
 
-      // Voice recognition simulation / Web Speech API
+      // Simulate Speech-to-Text transcript
       setTimeout(() => {
-        const sampleText = 'यहाँ एमजी रोड पर मेट्रो पिलर के सामने बहुत बड़ा गड्ढा है, गाड़ियां टकरा रही हैं। (There is a huge pothole causing accidents near metro pillar on MG Road.)';
-        setVoiceTranscript(sampleText);
-        setDescription(sampleText);
+        const sampleText =
+          'यहाँ एमजी रोड पर मेट्रो पिलर के सामने बहुत बड़ा गड्ढा है, गाड़ियां टकरा रही हैं। (There is a huge pothole causing accidents near metro pillar on MG Road.)';
+        setDescription((prev) => (prev ? `${prev} ${sampleText}` : sampleText));
         if (!title) setTitle('Road pothole hazard reported via voice note');
+        setErrors((prev) => ({ ...prev, description: undefined, title: undefined }));
       }, 2500);
     } else {
       setIsRecording(false);
@@ -151,6 +177,7 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
     setLatitude(preset.lat);
     setLongitude(preset.lng);
     setSelectedImage(preset.image);
+    setErrors({});
     setErrorMsg(null);
   };
 
@@ -161,19 +188,35 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
       const reader = new FileReader();
       reader.onload = () => {
         setSelectedImage(reader.result as string);
+        setErrors((prev) => ({ ...prev, image: undefined }));
       };
       reader.readAsDataURL(file);
     }
   };
 
-  // Submit to API
+  // Submit to API with strict validation (* required fields)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() && !description.trim() && !selectedImage) {
-      setErrorMsg('Please provide a title, description, or photo evidence.');
+
+    const newErrors: { title?: string; description?: string; image?: string } = {};
+
+    if (!title.trim()) {
+      newErrors.title = 'Title is required. Please provide a headline.';
+    }
+    if (!description.trim()) {
+      newErrors.description = 'Description is required. Please explain the civic issue.';
+    }
+    if (!selectedImage) {
+      newErrors.image = 'Photo evidence is required. Please upload or select an image.';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      setErrorMsg('Please fill in all mandatory fields marked with a red star (*).');
       return;
     }
 
+    setErrors({});
     setIsAnalyzing(true);
     setErrorMsg(null);
     setResult(null);
@@ -191,8 +234,8 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title,
-          description: description || voiceTranscript,
+          title: title.trim(),
+          description: description.trim(),
           imageBase64: selectedImage,
           latitude,
           longitude,
@@ -219,17 +262,19 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
     }
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6">
-      <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden my-8">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/65 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6">
+      <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden my-6 animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-slate-50/70">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-orange-600 text-white flex items-center justify-center shadow-xs">
-              <Sparkles className="w-4 h-4" />
+        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-slate-50/80">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-orange-600 text-white flex items-center justify-center shadow-xs">
+              <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-gray-900 leading-tight">
+              <h3 className="text-base sm:text-lg font-black text-gray-900 leading-tight">
                 Submit Public Grievance
               </h3>
               <p className="text-xs text-gray-500">
@@ -238,15 +283,15 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
             </div>
           </div>
           <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-gray-200/60 hover:bg-gray-200 flex items-center justify-center text-gray-600 transition-colors"
+            onClick={handleCloseModal}
+            className="w-8 h-8 rounded-full bg-gray-200/70 hover:bg-gray-200 flex items-center justify-center text-gray-600 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 max-h-[80vh] overflow-y-auto space-y-6">
+        <div className="p-6 max-h-[82vh] overflow-y-auto space-y-6">
           {/* Quick Demo Test Presets */}
           <div className="p-3.5 bg-orange-50/70 rounded-2xl border border-orange-100 space-y-2">
             <div className="flex items-center justify-between">
@@ -255,7 +300,7 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                 Quick Test Samples:
               </span>
               <span className="text-[11px] text-orange-700 font-medium">
-                Click to autofill real scenario
+                Click to autofill all required fields (*)
               </span>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -264,7 +309,7 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                   key={idx}
                   type="button"
                   onClick={() => applyPreset(preset)}
-                  className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white hover:bg-orange-100 text-gray-700 hover:text-orange-900 border border-orange-200/80 shadow-2xs transition-colors"
+                  className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white hover:bg-orange-100 text-gray-700 hover:text-orange-900 border border-orange-200/80 shadow-2xs transition-colors cursor-pointer"
                 >
                   {preset.name}
                 </button>
@@ -272,177 +317,153 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
             </div>
           </div>
 
-          {/* Form */}
+          {/* Error Banner */}
+          {errorMsg && (
+            <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-2.5 text-xs text-red-700">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          {/* Form View (when no result yet) */}
           {!result ? (
             <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Multimodal Input Selector Tabs */}
-              <div className="flex items-center p-1 bg-gray-100 rounded-xl">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('text')}
-                  className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
-                    activeTab === 'text'
-                      ? 'bg-white text-gray-900 shadow-xs'
-                      : 'text-gray-500 hover:text-gray-900'
-                  }`}
-                >
-                  ✍️ Text Statement
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('camera')}
-                  className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
-                    activeTab === 'camera'
-                      ? 'bg-white text-gray-900 shadow-xs'
-                      : 'text-gray-500 hover:text-gray-900'
-                  }`}
-                >
-                  📸 Photo / Vision
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('voice')}
-                  className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
-                    activeTab === 'voice'
-                      ? 'bg-white text-gray-900 shadow-xs'
-                      : 'text-gray-500 hover:text-gray-900'
-                  }`}
-                >
-                  🎙️ Voice Note
-                </button>
+              {/* Mandatory Notice */}
+              <div className="text-[11px] text-gray-500 flex items-center gap-1">
+                Fields marked with <span className="text-red-500 font-bold text-sm leading-none">*</span> are mandatory.
               </div>
 
-              {/* Text Tab */}
-              {activeTab === 'text' && (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                      Issue Title / Headline
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g., Large pothole in front of metro pillar"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      className="w-full px-3.5 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
-                    />
-                  </div>
+              {/* Title Field */}
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  Issue Title / Headline <span className="text-red-500 font-bold">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g., Large pothole in front of metro pillar"
+                  value={title}
+                  onChange={(e) => {
+                    setTitle(e.target.value);
+                    if (e.target.value.trim()) {
+                      setErrors((prev) => ({ ...prev, title: undefined }));
+                    }
+                  }}
+                  className={`w-full px-3.5 py-2.5 text-sm bg-white border rounded-xl focus:outline-none focus:ring-2 ${
+                    errors.title
+                      ? 'border-red-400 focus:ring-red-200 bg-red-50/20'
+                      : 'border-gray-200 focus:ring-orange-500/20 focus:border-orange-500'
+                  }`}
+                />
+                {errors.title && (
+                  <p className="text-[11px] text-red-600 font-semibold">{errors.title}</p>
+                )}
+              </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                      Detailed Description
-                    </label>
-                    <textarea
-                      rows={3}
-                      placeholder="Describe what is broken, hazards, traffic impact..."
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      className="w-full px-3.5 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Camera / Photo Tab */}
-              {activeTab === 'camera' && (
-                <div className="space-y-3">
-                  <div className="border-2 border-dashed border-gray-200 hover:border-orange-400 rounded-2xl p-6 text-center transition-colors">
-                    {selectedImage ? (
-                      <div className="relative inline-block group">
-                        <img
-                          src={selectedImage}
-                          alt="Grievance Preview"
-                          className="h-44 w-full object-cover rounded-xl shadow-xs"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setSelectedImage(null)}
-                          className="absolute top-2 right-2 bg-black/70 hover:bg-red-600 text-white p-1 rounded-full text-xs"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center">
-                        <Camera className="w-10 h-10 text-gray-400 mb-2" />
-                        <p className="text-sm font-semibold text-gray-700">
-                          Take photo or upload image
-                        </p>
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          Gemini 2.5 Flash Vision extracts visual damage severity
-                        </p>
-                        <label className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-xl cursor-pointer">
-                          <Upload className="w-3.5 h-3.5" />
-                          Browse File
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleFileUpload}
-                            className="hidden"
-                          />
-                        </label>
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <input
-                      type="text"
-                      placeholder="Brief note (optional)"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      className="w-full px-3.5 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Voice Tab */}
-              {activeTab === 'voice' && (
-                <div className="p-6 bg-slate-50 border border-gray-100 rounded-2xl flex flex-col items-center text-center space-y-4">
+              {/* Description Field + Voice Input */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    Detailed Description <span className="text-red-500 font-bold">*</span>
+                  </label>
                   <button
                     type="button"
                     onClick={toggleRecording}
-                    className={`w-16 h-16 rounded-full flex items-center justify-center transition-all ${
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                       isRecording
-                        ? 'bg-red-500 text-white animate-pulse-ring'
-                        : 'bg-orange-600 hover:bg-orange-700 text-white shadow-lg shadow-orange-600/30'
+                        ? 'bg-red-500 text-white animate-pulse'
+                        : 'bg-orange-100 hover:bg-orange-200 text-orange-800'
                     }`}
                   >
-                    <Mic className="w-7 h-7" />
+                    <Mic className="w-3.5 h-3.5" />
+                    {isRecording ? `Recording (${recordingSeconds}s)...` : '🎙️ Dictate Voice Note'}
                   </button>
-                  <div>
-                    <span className="text-sm font-bold text-gray-800">
-                      {isRecording
-                        ? `Listening & Transcribing (${recordingSeconds}s)...`
-                        : 'Tap microphone to speak'}
-                    </span>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Speaks Hindi, English, Hinglish, Marathi, etc.
-                    </p>
-                  </div>
+                </div>
+                <textarea
+                  rows={3}
+                  placeholder="Describe what is damaged, danger to pedestrians or vehicles, traffic impact..."
+                  value={description}
+                  onChange={(e) => {
+                    setDescription(e.target.value);
+                    if (e.target.value.trim()) {
+                      setErrors((prev) => ({ ...prev, description: undefined }));
+                    }
+                  }}
+                  className={`w-full px-3.5 py-2.5 text-sm bg-white border rounded-xl focus:outline-none focus:ring-2 ${
+                    errors.description
+                      ? 'border-red-400 focus:ring-red-200 bg-red-50/20'
+                      : 'border-gray-200 focus:ring-orange-500/20 focus:border-orange-500'
+                  }`}
+                />
+                {errors.description && (
+                  <p className="text-[11px] text-red-600 font-semibold">{errors.description}</p>
+                )}
+              </div>
 
-                  {voiceTranscript && (
-                    <div className="w-full text-left p-3 bg-white rounded-xl border border-gray-200 text-xs text-gray-700 font-mono">
-                      <span className="font-bold text-orange-600 block mb-1">
-                        Live AI Transcript:
-                      </span>
-                      {voiceTranscript}
+              {/* Photo Evidence Field */}
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  Photo Evidence / Visual Proof <span className="text-red-500 font-bold">*</span>
+                </label>
+                <div
+                  className={`border-2 border-dashed rounded-2xl p-5 text-center transition-colors ${
+                    errors.image
+                      ? 'border-red-400 bg-red-50/20'
+                      : 'border-gray-200 hover:border-orange-400 bg-slate-50/50'
+                  }`}
+                >
+                  {selectedImage ? (
+                    <div className="relative inline-block">
+                      <img
+                        src={selectedImage}
+                        alt="Evidence Preview"
+                        className="h-44 w-full max-w-sm object-cover rounded-xl shadow-xs border border-gray-200"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setSelectedImage(null)}
+                        className="absolute top-2 right-2 bg-black/70 hover:bg-red-600 text-white p-1 rounded-full text-xs shadow-md transition-colors cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center">
+                      <Camera className="w-9 h-9 text-gray-400 mb-2" />
+                      <p className="text-sm font-semibold text-gray-700">
+                        Upload or capture photo evidence
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        Required for Gemini 2.5 Flash Vision damage severity calculation
+                      </p>
+                      <label className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-xl cursor-pointer shadow-sm shadow-orange-600/30">
+                        <Upload className="w-3.5 h-3.5" />
+                        Browse Image File
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileUpload}
+                          className="hidden"
+                        />
+                      </label>
                     </div>
                   )}
                 </div>
-              )}
+                {errors.image && (
+                  <p className="text-[11px] text-red-600 font-semibold">{errors.image}</p>
+                )}
+              </div>
 
-              {/* Geolocation Section */}
+              {/* Location Field */}
               <div className="space-y-2 pt-2 border-t border-gray-100">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
                     <MapPin className="w-3.5 h-3.5 text-orange-600" />
-                    Complaint Location (PostGIS Index)
+                    Complaint Location (PostGIS 50m Index)
                   </label>
                   <button
                     type="button"
                     onClick={handleDetectLocation}
-                    className="text-xs font-semibold text-orange-600 hover:text-orange-700 flex items-center gap-1"
+                    className="text-xs font-semibold text-orange-600 hover:text-orange-700 flex items-center gap-1 cursor-pointer"
                   >
                     <RefreshCw className="w-3 h-3" />
                     Auto-Detect GPS
@@ -462,20 +483,12 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                 </div>
               </div>
 
-              {/* Error Box */}
-              {errorMsg && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-xs text-red-700">
-                  <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
-                  <span>{errorMsg}</span>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="pt-3 flex items-center justify-end gap-3 border-t border-gray-100">
+              {/* Modal Actions */}
+              <div className="pt-4 flex items-center justify-end gap-3 border-t border-gray-100">
                 <button
                   type="button"
-                  onClick={onClose}
-                  className="px-4 py-2.5 text-xs font-semibold text-gray-600 hover:text-gray-900 rounded-xl hover:bg-gray-100"
+                  onClick={handleCloseModal}
+                  className="px-4 py-2.5 text-xs font-semibold text-gray-600 hover:text-gray-900 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -499,41 +512,61 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
               </div>
             </form>
           ) : (
-            /* AI TRIAGE RESULT VIEW */
+            /* SUCCESS CONFIRMATION & TRIAGE RESULT VIEW */
             <div className="space-y-5 animate-in fade-in duration-300">
-              {/* Success Banner */}
+              {/* Big Success Banner */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-emerald-50 border-2 border-emerald-300 text-emerald-950 space-y-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                    <FileCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-black text-emerald-900">
+                      🎉 Complaint Submitted Successfully!
+                    </h4>
+                    <p className="text-xs text-emerald-800 font-medium">
+                      Your complaint has been logged and assigned Ticket ID{' '}
+                      <strong className="font-mono text-emerald-950 bg-emerald-200/80 px-2 py-0.5 rounded">
+                        {result.grievance.ticketNumber}
+                      </strong>
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Master Cluster Status Banner */}
               <div
                 className={`p-4 rounded-2xl border ${
                   result.isClustered
                     ? 'bg-purple-50 border-purple-200 text-purple-900'
-                    : 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                    : 'bg-blue-50 border-blue-200 text-blue-900'
                 }`}
               >
                 <div className="flex items-start gap-3">
                   {result.isClustered ? (
                     <Layers className="w-6 h-6 text-purple-600 shrink-0 mt-0.5" />
                   ) : (
-                    <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0 mt-0.5" />
+                    <CheckCircle2 className="w-6 h-6 text-blue-600 shrink-0 mt-0.5" />
                   )}
                   <div>
-                    <h4 className="text-sm font-bold">
+                    <h5 className="text-sm font-bold">
                       {result.isClustered
                         ? `Linked to Master Cluster ${result.masterTicket.masterTicketNumber}`
-                        : 'Complaint Successfully Triaged & Master Ticket Created!'}
-                    </h4>
+                        : `Standalone Master Ticket Created: ${result.masterTicket.masterTicketNumber}`}
+                    </h5>
                     <p className="text-xs mt-1 leading-relaxed">
                       {result.isClustered
-                        ? `AI Spatial-Semantic Engine detected an existing open issue within 50m with a ${result.clusterMatchScore}% similarity score. Linked for batch resolution without duplicate field dispatches.`
-                        : `Your ticket has been prioritized with Score ${result.triage.severity_score}/10 and routed to ${result.triage.department}.`}
+                        ? `AI Spatial-Semantic Engine detected an existing open issue within 50m with a ${result.clusterMatchScore}% similarity score. Grouped under Master Ticket for batch resolution.`
+                        : `No duplicate open complaints within 50m. Created as a new primary Master Ticket prioritized with Score ${result.triage.severity_score}/10.`}
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* AI Triage Breakdown Grid */}
+              {/* AI Structured Triage Breakdown */}
               <div className="bg-slate-50 border border-gray-100 rounded-2xl p-4 space-y-3">
-                <div className="flex items-center justify-between border-b border-gray-200/80 pb-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
+                <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
                     Gemini 2.5 Flash Structured Triage Output
                   </span>
                   <span className="text-xs font-mono font-bold text-orange-600 bg-orange-100 px-2 py-0.5 rounded">
@@ -589,7 +622,7 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
 
                 <div className="p-3 bg-white rounded-xl border border-gray-100 space-y-1">
                   <span className="text-[10px] text-gray-400 font-semibold block">
-                    Recommended SOP Action:
+                    Recommended Action:
                   </span>
                   <p className="text-xs font-medium text-gray-800">
                     {result.triage.recommended_action}
@@ -597,28 +630,36 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                 </div>
               </div>
 
-              {/* Close & Continue buttons */}
-              <div className="flex items-center justify-between pt-2">
+              {/* Action Buttons to Go Back or Submit New Complaint */}
+              <div className="pt-3 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+                {/* Back to Submit New Complaint */}
                 <button
                   type="button"
-                  onClick={() => {
-                    setResult(null);
-                    setTitle('');
-                    setDescription('');
-                    setSelectedImage(null);
-                  }}
-                  className="text-xs font-semibold text-gray-600 hover:text-gray-900"
+                  onClick={handleResetForm}
+                  className="w-full sm:w-auto px-4 py-2.5 text-xs font-bold text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                 >
-                  Submit Another Grievance
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  ← Back to Submit New Complaint
                 </button>
 
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-5 py-2.5 text-xs font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-xl shadow-md shadow-orange-600/30"
-                >
-                  Done
-                </button>
+                <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                  <Link
+                    href="/officer/dashboard"
+                    onClick={handleCloseModal}
+                    className="flex-1 sm:flex-initial px-4 py-2.5 text-xs font-semibold text-gray-700 hover:text-orange-600 bg-gray-100 hover:bg-gray-200 rounded-xl flex items-center justify-center gap-1.5 transition-colors"
+                  >
+                    <LayoutDashboard className="w-3.5 h-3.5" />
+                    Officer View
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={handleCloseModal}
+                    className="flex-1 sm:flex-initial px-6 py-2.5 text-xs font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-xl shadow-md shadow-orange-600/30 transition-all cursor-pointer"
+                  >
+                    Done
+                  </button>
+                </div>
               </div>
             </div>
           )}
