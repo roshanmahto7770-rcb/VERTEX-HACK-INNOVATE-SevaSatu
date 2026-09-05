@@ -29,6 +29,7 @@ import {
   formatAddress,
   reverseGeocode,
 } from '@/components/landing/UserProfileModal';
+import { MiniMap } from '@/components/common/MiniMap';
 
 interface SubmitComplaintModalProps {
   isOpen: boolean;
@@ -1093,6 +1094,21 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                       className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
                     />
                   </div>
+                </div>
+
+                {/* ── LIVE INTERACTIVE MINI MAP ── */}
+                <div className="space-y-1 pt-1">
+                  <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center justify-between">
+                    <span>Incident Location Mini Map</span>
+                    <span className="text-[9px] text-orange-600 font-semibold">Live Interactive Pin</span>
+                  </label>
+                  <MiniMap
+                    latitude={latitude}
+                    longitude={longitude}
+                    addressText={formatAddress(complaintLocation) || complaintLocation.street}
+                    height="h-40"
+                    showNavigationButton={true}
+                  />
                 </div>
 
                 <p className="text-[10px] text-gray-400 italic text-center">

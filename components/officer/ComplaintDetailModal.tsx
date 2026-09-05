@@ -24,8 +24,8 @@ import {
   Sparkles,
   XCircle,
   Check,
-} from 'lucide-react';
 import { Grievance, ComplaintStatus } from '@/lib/types';
+import { MiniMap } from '@/components/common/MiniMap';
 
 interface ComplaintDetailModalProps {
   complaint: Grievance | null;
@@ -365,15 +365,26 @@ export const ComplaintDetailModal: React.FC<ComplaintDetailModalProps> = ({
           </div>
 
           {/* Location */}
-          <div>
+          <div className="space-y-1.5">
             <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">
-              Location
+              Incident Location & Navigation
             </label>
-            <p className="text-gray-700 font-medium">{complaint.addressText}</p>
+            <p className="text-gray-800 font-bold">{complaint.addressText}</p>
             <p className="text-[11px] text-gray-400 font-mono mt-0.5 flex items-center gap-1">
-              <MapPin className="w-3 h-3 text-gray-400" />
+              <MapPin className="w-3 h-3 text-orange-600" />
               Lat: {complaint.latitude}, Long: {complaint.longitude}
             </p>
+
+            {/* Mini Map */}
+            <div className="pt-1">
+              <MiniMap
+                latitude={complaint.latitude}
+                longitude={complaint.longitude}
+                addressText={complaint.addressText}
+                height="h-44"
+                showNavigationButton={true}
+              />
+            </div>
           </div>
 
           {/* Description */}

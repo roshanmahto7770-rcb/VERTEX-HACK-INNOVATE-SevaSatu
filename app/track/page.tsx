@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Search, Building, MapPin, CheckCircle2, Clock, ShieldCheck, AlertCircle } from 'lucide-react';
 import { Grievance, MasterComplaint, StatusLog } from '@/lib/types';
+import { MiniMap } from '@/components/common/MiniMap';
 
 export default function TrackPage() {
   const [ticketInput, setTicketInput] = useState('#C-1248');
@@ -175,6 +176,19 @@ export default function TrackPage() {
                   </div>
                 </div>
               </div>
+
+              {/* ── INCIDENT SITE MINI MAP ── */}
+              {data.grievance.latitude && data.grievance.longitude && (
+                <div className="pt-2">
+                  <MiniMap
+                    latitude={data.grievance.latitude}
+                    longitude={data.grievance.longitude}
+                    addressText={data.grievance.addressText}
+                    height="h-48"
+                    showNavigationButton={true}
+                  />
+                </div>
+              )}
 
               {data.grievance.officerComment && (
                 <div className="p-4 bg-white border border-gray-200 rounded-xl space-y-1">
