@@ -181,7 +181,7 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
   const [isFinalSuccess, setIsFinalSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // ── Load saved profile whenever modal opens ────────────────────────────────
+  // ── Load saved profile whenever modal opens & Auto-Detect GPS Location ───
   useEffect(() => {
     if (isOpen) {
       const profile = getSavedProfile();
@@ -194,6 +194,11 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
         setCitizenName('');
         setCitizenPhone('');
         setCitizenAddress(emptyComplaintLocation());
+      }
+
+      // Automatically auto-fetch high-precision GPS coordinates & geocoded address
+      if (!complaintLocation.street || !complaintLocation.state) {
+        handleDetectComplaintLocation();
       }
     }
   }, [isOpen]);
@@ -956,88 +961,116 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                 )}
               </div>
 
-              {/* ── COMPLAINT LOCATION (where the issue is) ───────────────── */}
-              <div className="space-y-2 pt-2 border-t border-gray-100">
+              {/* ── COMPLAINT LOCATION (GPS AUTO-FETCHED & LOCKED) ───────────────── */}
+              <div className="space-y-2.5 pt-2 border-t border-gray-100">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <label className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
                     <Navigation className="w-3.5 h-3.5 text-orange-600" />
                     Issue Location <span className="text-red-500 font-bold">*</span>
-                    <span className="text-gray-400 font-normal text-[10px] normal-case tracking-normal">
-                      (where the problem is)
+                    <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      Auto-Fetched via GPS
                     </span>
                   </label>
+
+                  {/* Re-sync GPS button */}
                   <button
                     type="button"
                     onClick={handleDetectComplaintLocation}
                     disabled={detectingComplaintGps}
-                    className="text-xs font-semibold text-orange-600 hover:text-orange-700 flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    className="text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 px-3 py-1 rounded-xl flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors"
                   >
                     <RefreshCw
                       className={`w-3 h-3 ${detectingComplaintGps ? 'animate-spin' : ''}`}
                     />
-                    {detectingComplaintGps ? 'Detecting GPS…' : 'Use My GPS'}
+                    {detectingComplaintGps ? 'Detecting Live GPS…' : 'Re-sync Live GPS'}
                   </button>
                 </div>
+
+                {/* GPS Pinpoint Card */}
+                <div className="p-3 bg-gradient-to-r from-orange-50/60 to-amber-50/60 border border-orange-200/80 rounded-2xl flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-orange-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <MapPin className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-orange-900 block">
+                        GPS Geofence Pinpoint
+                      </span>
+                      <span className="font-mono text-gray-700 text-[11px]">
+                        Lat: {latitude}, Long: {longitude}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-white px-2.5 py-1 rounded-lg border border-emerald-200 shadow-2xs flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                    GPS Locked
+                  </span>
+                </div>
+
+                {/* Locked / Auto-Fetched Address Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider">
-                      State <span className="text-red-500 font-bold">*</span>
+                    <label className="text-[10px] font-bold text-gray-600 uppercase tracking-wider flex items-center justify-between">
+                      <span>State</span>
+                      <span className="text-[9px] text-gray-400 font-normal">Auto-detected</span>
                     </label>
                     <input
                       type="text"
-                      value={complaintLocation.state}
-                      onChange={(e) => setComplaintField('state', e.target.value)}
-                      placeholder="e.g., Delhi, Maharashtra"
-                      className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
+                      readOnly
+                      value={complaintLocation.state || 'Detecting State…'}
+                      placeholder="Auto-detected via GPS"
+                      className="w-full px-3 py-2 text-xs bg-gray-100 text-gray-800 font-medium border border-gray-200 rounded-xl cursor-not-allowed select-none focus:outline-none"
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider">
-                      City / District <span className="text-red-500 font-bold">*</span>
+                    <label className="text-[10px] font-bold text-gray-600 uppercase tracking-wider flex items-center justify-between">
+                      <span>City / District</span>
+                      <span className="text-[9px] text-gray-400 font-normal">Auto-detected</span>
                     </label>
                     <input
                       type="text"
-                      value={complaintLocation.city}
-                      onChange={(e) => setComplaintField('city', e.target.value)}
-                      placeholder="e.g., New Delhi, Mumbai"
-                      className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
+                      readOnly
+                      value={complaintLocation.city || 'Detecting City…'}
+                      placeholder="Auto-detected via GPS"
+                      className="w-full px-3 py-2 text-xs bg-gray-100 text-gray-800 font-medium border border-gray-200 rounded-xl cursor-not-allowed select-none focus:outline-none"
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider">
-                      Pincode / ZIP <span className="text-red-500 font-bold">*</span>
+                    <label className="text-[10px] font-bold text-gray-600 uppercase tracking-wider flex items-center justify-between">
+                      <span>Pincode / ZIP</span>
+                      <span className="text-[9px] text-gray-400 font-normal">Auto-detected</span>
                     </label>
                     <input
                       type="text"
-                      inputMode="numeric"
-                      maxLength={6}
-                      value={complaintLocation.pincode}
-                      onChange={(e) => setComplaintField('pincode', e.target.value.replace(/\D/g, ''))}
-                      placeholder="e.g., 110024"
-                      className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
+                      readOnly
+                      value={complaintLocation.pincode || 'Detecting Pincode…'}
+                      placeholder="Auto-detected via GPS"
+                      className="w-full px-3 py-2 text-xs bg-gray-100 text-gray-800 font-medium border border-gray-200 rounded-xl cursor-not-allowed select-none focus:outline-none font-mono"
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider">
-                      Street / Road / Landmark <span className="text-red-500 font-bold">*</span>
+                    <label className="text-[10px] font-bold text-gray-600 uppercase tracking-wider flex items-center justify-between">
+                      <span>Street / Road / Area</span>
+                      <span className="text-[9px] text-gray-400 font-normal">Auto-detected</span>
                     </label>
                     <input
                       type="text"
-                      value={complaintLocation.street}
-                      onChange={(e) => setComplaintField('street', e.target.value)}
-                      placeholder="e.g., MG Road, Near Metro Pillar 142"
-                      className={`w-full px-3 py-2 text-xs bg-white border rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500 ${
+                      readOnly
+                      value={complaintLocation.street || 'Detecting Street via GPS…'}
+                      placeholder="Auto-detected via GPS"
+                      className={`w-full px-3 py-2 text-xs bg-gray-100 text-gray-800 font-medium border rounded-xl cursor-not-allowed select-none focus:outline-none ${
                         errors.complaintAddress ? 'border-red-400 bg-red-50/20' : 'border-gray-200'
                       }`}
                     />
                   </div>
 
+                  {/* Optional House / Flat & Landmark for minor precision */}
                   <div className="space-y-1">
                     <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider">
-                      House / Flat No. <span className="text-gray-400 font-normal normal-case">(Optional)</span>
+                      House / Flat No. <span className="text-gray-400 font-normal normal-case">(Optional Door No.)</span>
                     </label>
                     <input
                       type="text"
@@ -1050,20 +1083,22 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
 
                   <div className="space-y-1">
                     <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider">
-                      Building / Society <span className="text-gray-400 font-normal normal-case">(Optional)</span>
+                      Building / Landmark Note <span className="text-gray-400 font-normal normal-case">(Optional)</span>
                     </label>
                     <input
                       type="text"
                       value={complaintLocation.building}
                       onChange={(e) => setComplaintField('building', e.target.value)}
-                      placeholder="e.g., Metro Station, Block C (Optional)"
+                      placeholder="e.g., Near Metro Pillar 142 (Optional)"
                       className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
                     />
                   </div>
                 </div>
-                <div className="px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl text-gray-600 font-mono flex items-center justify-center">
-                  GPS: {latitude}, {longitude}
-                </div>
+
+                <p className="text-[10px] text-gray-400 italic text-center">
+                  🔒 Core location is auto-fetched and locked from device GPS to prevent false or incorrect grievance locations.
+                </p>
+
                 {errors.complaintAddress && (
                   <p className="text-[11px] text-red-600 font-semibold">{errors.complaintAddress}</p>
                 )}
