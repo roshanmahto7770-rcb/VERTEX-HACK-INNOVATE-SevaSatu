@@ -24,6 +24,7 @@ import {
   Sparkles,
   XCircle,
   Check,
+} from 'lucide-react';
 import { Grievance, ComplaintStatus } from '@/lib/types';
 import { MiniMap } from '@/components/common/MiniMap';
 
