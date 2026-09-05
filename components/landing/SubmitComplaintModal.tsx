@@ -21,7 +21,13 @@ import {
   Navigation,
 } from 'lucide-react';
 import { GeminiTriageOutput, Grievance, MasterComplaint } from '@/lib/types';
-import { getSavedProfile, UserProfile, formatAddress } from '@/components/landing/UserProfileModal';
+import {
+  getSavedProfile,
+  UserProfile,
+  StructuredAddress,
+  formatAddress,
+  reverseGeocode,
+} from '@/components/landing/UserProfileModal';
 
 interface SubmitComplaintModalProps {
   isOpen: boolean;
@@ -75,6 +81,15 @@ const SAMPLE_PRESETS = [
   },
 ];
 
+const emptyComplaintLocation = (): StructuredAddress => ({
+  houseNo: '',
+  building: '',
+  street: '',
+  city: '',
+  state: '',
+  pincode: '',
+});
+
 export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
   isOpen,
   onClose,
@@ -97,10 +112,17 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
   const [userAddress, setUserAddress] = useState('');  // formatted display string
 
   // ── Complaint location (where the issue actually is) ───────────────────────
-  const [complaintAddress, setComplaintAddress] = useState('');
+  const [complaintLocation, setComplaintLocation] = useState<StructuredAddress>(emptyComplaintLocation());
   const [latitude, setLatitude] = useState(28.6304);
   const [longitude, setLongitude] = useState(77.2177);
   const [detectingComplaintGps, setDetectingComplaintGps] = useState(false);
+
+  const setComplaintField = (field: keyof StructuredAddress, value: string) => {
+    setComplaintLocation((previous) => ({ ...previous, [field]: value }));
+    if (value.trim()) {
+      setErrors((previous) => ({ ...previous, complaintAddress: undefined }));
+    }
+  };
 
   // ── Validation errors ──────────────────────────────────────────────────────
   const [errors, setErrors] = useState<{
@@ -152,7 +174,7 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
     setTitle('');
     setDescription('');
     setSelectedImage(null);
-    setComplaintAddress('');
+    setComplaintLocation(emptyComplaintLocation());
     setLatitude(28.6304);
     setLongitude(77.2177);
     setErrors({});
@@ -174,19 +196,33 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
     setDetectingComplaintGps(true);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const lat = Number(pos.coords.latitude.toFixed(4));
-          const lng = Number(pos.coords.longitude.toFixed(4));
+        async (pos) => {
+          const lat = Number(pos.coords.latitude.toFixed(6));
+          const lng = Number(pos.coords.longitude.toFixed(6));
           setLatitude(lat);
           setLongitude(lng);
-          setComplaintAddress(`GPS Detected: Lat ${lat}, Long ${lng}`);
+          const geocoded = await reverseGeocode(lat, lng);
+          setComplaintLocation((previous) => ({
+            houseNo: geocoded.houseNo ?? previous.houseNo,
+            building: geocoded.building ?? previous.building,
+            street: geocoded.street ?? previous.street,
+            city: geocoded.city ?? previous.city,
+            state: geocoded.state ?? previous.state,
+            pincode: geocoded.pincode ?? previous.pincode,
+          }));
           setDetectingComplaintGps(false);
           setErrors((prev) => ({ ...prev, complaintAddress: undefined }));
         },
         () => {
           setLatitude(28.6304);
           setLongitude(77.2177);
-          setComplaintAddress('MG Road, Delhi (Lat: 28.6304, Long: 77.2177)');
+          setComplaintLocation({
+            ...emptyComplaintLocation(),
+            street: 'MG Road',
+            city: 'New Delhi',
+            state: 'Delhi',
+            pincode: '110001',
+          });
           setDetectingComplaintGps(false);
         }
       );
@@ -222,7 +258,12 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
   const applyPreset = (preset: (typeof SAMPLE_PRESETS)[0]) => {
     setTitle(preset.title);
     setDescription(preset.desc);
-    setComplaintAddress(preset.address);
+    setComplaintLocation({
+      ...emptyComplaintLocation(),
+      street: preset.address,
+      city: 'New Delhi',
+      state: 'Delhi',
+    });
     setLatitude(preset.lat);
     setLongitude(preset.lng);
     setSelectedImage(preset.image);
@@ -263,6 +304,7 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
     if (!selectedImage) {
       newErrors.image = 'Photo evidence is required. Please upload or select an image.';
     }
+    const complaintAddress = formatAddress(complaintLocation);
     if (!complaintAddress.trim()) {
       newErrors.complaintAddress = 'Please specify the location where the issue is occurring.';
     }
@@ -630,23 +672,56 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                     {detectingComplaintGps ? 'Detecting GPS…' : 'Use My GPS'}
                   </button>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <input
                     type="text"
-                    value={complaintAddress}
-                    onChange={(e) => {
-                      setComplaintAddress(e.target.value);
-                      if (e.target.value.trim())
-                        setErrors((prev) => ({ ...prev, complaintAddress: undefined }));
-                    }}
-                    placeholder="Address / Landmark where the issue is"
-                    className={`sm:col-span-2 px-3 py-2 text-xs bg-white border rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500 ${
+                    value={complaintLocation.houseNo}
+                    onChange={(e) => setComplaintField('houseNo', e.target.value)}
+                    placeholder="House / Flat No."
+                    className="px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
+                  />
+                  <input
+                    type="text"
+                    value={complaintLocation.building}
+                    onChange={(e) => setComplaintField('building', e.target.value)}
+                    placeholder="Building / Society / Colony"
+                    className="px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
+                  />
+                  <input
+                    type="text"
+                    value={complaintLocation.street}
+                    onChange={(e) => setComplaintField('street', e.target.value)}
+                    placeholder="Street / Road / Area / Landmark"
+                    className={`px-3 py-2 text-xs bg-white border rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500 ${
                       errors.complaintAddress ? 'border-red-400 bg-red-50/20' : 'border-gray-200'
                     }`}
                   />
-                  <div className="px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl text-gray-600 font-mono flex items-center justify-center">
-                    {latitude}, {longitude}
-                  </div>
+                  <input
+                    type="text"
+                    value={complaintLocation.city}
+                    onChange={(e) => setComplaintField('city', e.target.value)}
+                    placeholder="City / District"
+                    className="px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
+                  />
+                  <input
+                    type="text"
+                    value={complaintLocation.state}
+                    onChange={(e) => setComplaintField('state', e.target.value)}
+                    placeholder="State"
+                    className="px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
+                  />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={complaintLocation.pincode}
+                    onChange={(e) => setComplaintField('pincode', e.target.value.replace(/\D/g, ''))}
+                    placeholder="Pincode"
+                    className="px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
+                  />
+                </div>
+                <div className="px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl text-gray-600 font-mono flex items-center justify-center">
+                  GPS: {latitude}, {longitude}
                 </div>
                 {errors.complaintAddress && (
                   <p className="text-[11px] text-red-600 font-semibold">{errors.complaintAddress}</p>

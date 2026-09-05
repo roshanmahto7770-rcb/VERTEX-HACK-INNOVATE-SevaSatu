@@ -59,7 +59,7 @@ export function saveProfile(profile: UserProfile): void {
 }
 
 // ── Nominatim reverse-geocode → StructuredAddress ─────────────────────────────
-async function reverseGeocode(lat: number, lng: number): Promise<Partial<StructuredAddress>> {
+export async function reverseGeocode(lat: number, lng: number): Promise<Partial<StructuredAddress>> {
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;
     const res = await fetch(url, {
@@ -344,10 +344,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               </p>
             )}
 
-            {/* Row 1: House No + Building */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Address Line 1 */}
+            <div>
               <Field
-                label="House / Flat No."
+                label="Address Line 1 - House / Flat No."
                 required
                 icon={<Hash className="w-3 h-3" />}
                 error={errors.houseNo}
@@ -361,22 +361,23 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 />
               </Field>
 
-              <Field
-                label="Building / Society"
-                icon={<Building2 className="w-3 h-3" />}
-                error={errors.building}
-              >
-                <input
-                  type="text"
-                  placeholder="e.g., Green Park Apartments"
-                  value={addr.building}
-                  onChange={(e) => setField('building', e.target.value)}
-                  className={inputCls(!!errors.building)}
-                />
-              </Field>
             </div>
 
-            {/* Row 2: Street */}
+            {/* Address Line 2 */}
+            <Field
+              label="Address Line 2 - Building / Society"
+              icon={<Building2 className="w-3 h-3" />}
+              error={errors.building}
+            >
+              <input
+                type="text"
+                placeholder="e.g., Green Park Apartments"
+                value={addr.building}
+                onChange={(e) => setField('building', e.target.value)}
+                className={inputCls(!!errors.building)}
+              />
+            </Field>
+
             <Field
               label="Street / Road / Area"
               required
@@ -392,8 +393,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               />
             </Field>
 
-            {/* Row 3: City + State + Pincode */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* City and State are separate fields */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="City / District" required error={errors.city}>
                 <input
                   type="text"
@@ -414,18 +415,19 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 />
               </Field>
 
-              <Field label="Pincode" required error={errors.pincode}>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  placeholder="110024"
-                  value={addr.pincode}
-                  onChange={(e) => setField('pincode', e.target.value.replace(/\D/g, ''))}
-                  className={inputCls(!!errors.pincode)}
-                />
-              </Field>
             </div>
+
+            <Field label="Pincode / ZIP" required error={errors.pincode}>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="110024"
+                value={addr.pincode}
+                onChange={(e) => setField('pincode', e.target.value.replace(/\D/g, ''))}
+                className={inputCls(!!errors.pincode)}
+              />
+            </Field>
           </div>
 
           {/* Save / Cancel */}
