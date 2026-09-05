@@ -14,11 +14,13 @@ export async function PATCH(
       officerComment,
       proofImageUrl,
       officerName = 'Rohit Sharma (PWD Officer)',
+      department,
     } = body as {
       status: ComplaintStatus;
       officerComment?: string;
       proofImageUrl?: string;
       officerName?: string;
+      department?: string;
     };
 
     if (!status) {
@@ -37,7 +39,8 @@ export async function PATCH(
         status,
         officerComment,
         proofImageUrl,
-        officerName
+        officerName,
+        department
       );
 
       if (!result) {
@@ -59,7 +62,8 @@ export async function PATCH(
         grievance.id,
         status,
         officerComment,
-        officerName
+        officerName,
+        department
       );
       return NextResponse.json({
         success: true,

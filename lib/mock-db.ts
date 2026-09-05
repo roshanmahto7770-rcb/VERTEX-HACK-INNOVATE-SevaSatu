@@ -422,19 +422,22 @@ class MockDatabase {
     newStatus: ComplaintStatus,
     officerComment?: string,
     proofImageUrl?: string,
-    officerName: string = 'Rohit Sharma (PWD)'
+    officerName: string = 'Rohit Sharma (PWD)',
+    department?: string
   ): { master: MasterComplaint; updatedChildrenCount: number } | null {
     const master = this.masterComplaints.find((m) => m.id === masterId);
     if (!master) return null;
 
     const oldStatus = master.status;
     master.status = newStatus;
+    if (department) master.department = department;
     master.updatedAt = new Date().toISOString();
 
     let updatedChildrenCount = 0;
     for (const g of this.grievances) {
       if (g.masterComplaintId === masterId) {
         g.status = newStatus;
+        if (department) g.department = department;
         if (officerComment) g.officerComment = officerComment;
         g.updatedAt = new Date().toISOString();
         updatedChildrenCount++;
@@ -448,7 +451,7 @@ class MockDatabase {
       officerName,
       oldStatus,
       newStatus,
-      comment: officerComment || `Status updated to ${newStatus} (cascaded to ${updatedChildrenCount} complaints).`,
+      comment: officerComment || `Status updated to ${newStatus}${department ? ` (Dept: ${department})` : ''} (cascaded to ${updatedChildrenCount} complaints).`,
       proofImageUrl,
       createdAt: new Date().toISOString(),
     });
@@ -461,13 +464,15 @@ class MockDatabase {
     grievanceId: string,
     newStatus: ComplaintStatus,
     officerComment?: string,
-    officerName: string = 'Rohit Sharma (PWD)'
+    officerName: string = 'Rohit Sharma (PWD)',
+    department?: string
   ): Grievance | null {
     const g = this.grievances.find((item) => item.id === grievanceId);
     if (!g) return null;
 
     const oldStatus = g.status;
     g.status = newStatus;
+    if (department) g.department = department;
     if (officerComment) g.officerComment = officerComment;
     g.updatedAt = new Date().toISOString();
 
@@ -478,7 +483,7 @@ class MockDatabase {
       officerName,
       oldStatus,
       newStatus,
-      comment: officerComment || `Status changed to ${newStatus}`,
+      comment: officerComment || `Status changed to ${newStatus}${department ? ` (Dept: ${department})` : ''}`,
       createdAt: new Date().toISOString(),
     });
 

@@ -78,6 +78,9 @@ export interface Grievance {
   recommendedAction?: string;
   summary?: string;
   attachments?: string[];
+  assignedOfficer?: string;
+  assignedOfficerContact?: string;
+  assignedDepartment?: string;
   officerComment?: string;
   createdAt: string;
   updatedAt: string;
