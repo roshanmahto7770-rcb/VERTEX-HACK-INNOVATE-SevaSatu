@@ -198,8 +198,98 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
     }
   }, [isOpen]);
 
+  // ── Camera capture state (Direct Camera Only) ──────────────────────────────
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const nativeCameraInputRef = useRef<HTMLInputElement | null>(null);
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    setIsCameraActive(false);
+    setCameraError(null);
+  };
+
+  const startCamera = async (facing: 'environment' | 'user' = cameraFacing) => {
+    setCameraError(null);
+    try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: facing,
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        });
+        streamRef.current = stream;
+        setIsCameraActive(true);
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().catch(() => {});
+        }
+      } else {
+        throw new Error('WebRTC getUserMedia not supported');
+      }
+    } catch (err: any) {
+      console.warn('Live WebRTC camera stream error, using native device camera:', err);
+      // Fallback: trigger native device camera
+      if (nativeCameraInputRef.current) {
+        nativeCameraInputRef.current.click();
+      }
+    }
+  };
+
+  const switchCameraFacing = () => {
+    const newFacing = cameraFacing === 'environment' ? 'user' : 'environment';
+    setCameraFacing(newFacing);
+    startCamera(newFacing);
+  };
+
+  const capturePhoto = () => {
+    if (!videoRef.current) return;
+    try {
+      const video = videoRef.current;
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        setSelectedImage(dataUrl);
+        setErrors((prev) => ({ ...prev, image: undefined }));
+        stopCamera();
+      }
+    } catch (err: any) {
+      console.error('Error capturing canvas photo:', err);
+    }
+  };
+
+  const handleNativeCameraCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setSelectedImage(reader.result as string);
+        setErrors((prev) => ({ ...prev, image: undefined }));
+        stopCamera();
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   // ── Reset complaint form (keeps profile data) ──────────────────────────────
   const handleResetForm = () => {
+    stopCamera();
     setTitle('');
     setDescription('');
     setSelectedImage(null);
@@ -702,52 +792,162 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                 )}
               </div>
 
-              {/* Photo Evidence Field */}
-              <div className="space-y-1">
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  Photo Evidence / Visual Proof <span className="text-red-500 font-bold">*</span>
-                </label>
+              {/* ── PHOTO EVIDENCE FIELD (DIRECT CAMERA CAPTURE ONLY) ── */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <Camera className="w-3.5 h-3.5 text-orange-600" />
+                    Live Photo Evidence / Camera Proof <span className="text-red-500 font-bold">*</span>
+                  </label>
+                  <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    Live Camera Only
+                  </span>
+                </div>
+
                 <div
-                  className={`border-2 border-dashed rounded-2xl p-5 text-center transition-colors ${
+                  className={`border-2 border-dashed rounded-2xl p-4 text-center transition-all ${
                     errors.image
                       ? 'border-red-400 bg-red-50/20'
                       : 'border-gray-200 hover:border-orange-400 bg-slate-50/50'
                   }`}
                 >
+                  {/* Hidden Native Mobile Direct Camera Input */}
+                  <input
+                    ref={nativeCameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleNativeCameraCapture}
+                    className="hidden"
+                  />
+
+                  {/* 1. Captured Photo Preview */}
                   {selectedImage ? (
-                    <div className="relative inline-block">
-                      <img
-                        src={selectedImage}
-                        alt="Evidence Preview"
-                        className="h-44 w-full max-w-sm object-cover rounded-xl shadow-xs border border-gray-200"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setSelectedImage(null)}
-                        className="absolute top-2 right-2 bg-black/70 hover:bg-red-600 text-white p-1 rounded-full text-xs shadow-md transition-colors cursor-pointer"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
+                    <div className="relative flex flex-col items-center space-y-2.5">
+                      <div className="relative inline-block overflow-hidden rounded-2xl border border-gray-200 shadow-md">
+                        <img
+                          src={selectedImage}
+                          alt="Live Camera Evidence Preview"
+                          className="h-48 w-full max-w-sm object-cover"
+                        />
+                        <span className="absolute bottom-2 left-2 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-black/75 text-emerald-400 backdrop-blur-xs flex items-center gap-1 shadow-sm">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                          Live Camera Captured
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedImage(null);
+                            stopCamera();
+                          }}
+                          className="absolute top-2 right-2 bg-black/75 hover:bg-red-600 text-white p-1.5 rounded-full text-xs shadow-md transition-colors cursor-pointer"
+                          title="Remove & Retake"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedImage(null);
+                            startCamera('environment');
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-100 hover:bg-orange-50 hover:text-orange-600 text-gray-700 text-xs font-semibold border border-gray-200 transition-colors cursor-pointer"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          Retake Photo via Camera
+                        </button>
+                      </div>
+                    </div>
+                  ) : isCameraActive ? (
+                    /* 2. Live WebRTC Viewfinder */
+                    <div className="flex flex-col items-center space-y-3">
+                      <div className="relative w-full max-w-sm h-52 bg-black rounded-2xl overflow-hidden shadow-inner border-2 border-orange-500">
+                        <video
+                          ref={videoRef}
+                          autoPlay
+                          playsInline
+                          muted
+                          className="w-full h-full object-cover"
+                        />
+                        {/* Camera Targeting Crosshair Grid */}
+                        <div className="absolute inset-0 border border-white/20 pointer-events-none grid grid-cols-3 grid-rows-3 opacity-60">
+                          <div className="border-r border-b border-white/10" />
+                          <div className="border-r border-b border-white/10" />
+                          <div className="border-b border-white/10" />
+                          <div className="border-r border-b border-white/10" />
+                          <div className="border-r border-b border-white/10 flex items-center justify-center">
+                            <div className="w-8 h-8 rounded-full border border-orange-400/80 animate-ping opacity-75" />
+                          </div>
+                          <div className="border-b border-white/10" />
+                          <div className="border-r border-white/10" />
+                          <div className="border-r border-white/10" />
+                          <div />
+                        </div>
+                        <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-bold bg-red-600 text-white uppercase tracking-wider animate-pulse">
+                          ● Live Camera Viewfinder
+                        </span>
+                      </div>
+
+                      {/* Camera Controls */}
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={switchCameraFacing}
+                          className="p-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold transition-colors cursor-pointer"
+                          title="Flip / Switch Camera"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={capturePhoto}
+                          className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 active:scale-95 text-white text-xs font-bold shadow-lg shadow-orange-600/40 flex items-center gap-2 transition-all cursor-pointer"
+                        >
+                          <Camera className="w-4 h-4" />
+                          Capture Photo Evidence
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={stopCamera}
+                          className="p-2.5 rounded-xl bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-600 text-xs font-semibold transition-colors cursor-pointer"
+                          title="Cancel Camera"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center">
-                      <Camera className="w-9 h-9 text-gray-400 mb-2" />
-                      <p className="text-sm font-semibold text-gray-700">
-                        Upload or capture photo evidence
+                    /* 3. Open Camera Trigger (No Gallery Upload) */
+                    <div className="flex flex-col items-center py-2">
+                      <div className="w-12 h-12 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center mb-2 shadow-xs ring-4 ring-orange-50">
+                        <Camera className="w-6 h-6" />
+                      </div>
+                      <p className="text-sm font-bold text-gray-800">
+                        Capture Live Photo Evidence
                       </p>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        Required for Gemini 2.5 Flash Vision damage severity calculation
+                      <p className="text-xs text-gray-400 mt-0.5 max-w-xs">
+                        Direct camera snapshot required for AI vision damage severity & instant duplicate check
                       </p>
-                      <label className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold rounded-xl cursor-pointer shadow-sm shadow-orange-600/30">
-                        <Upload className="w-3.5 h-3.5" />
-                        Browse Image File
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleFileUpload}
-                          className="hidden"
-                        />
-                      </label>
+
+                      <div className="mt-3.5 flex flex-wrap items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => startCamera('environment')}
+                          className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-600 hover:bg-orange-700 active:scale-95 text-white text-xs font-bold rounded-xl cursor-pointer shadow-md shadow-orange-600/30 transition-all"
+                        >
+                          <Camera className="w-4 h-4" />
+                          Open Camera to Capture
+                        </button>
+                      </div>
+
+                      <p className="text-[10px] text-gray-400 mt-2 italic">
+                        Gallery upload disabled to guarantee on-site evidence authenticity
+                      </p>
                     </div>
                   )}
                 </div>
