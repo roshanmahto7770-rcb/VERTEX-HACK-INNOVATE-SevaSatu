@@ -527,12 +527,12 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                 </div>
 
                 {/* 2. Structured Address: State -> City -> Pincode -> Address Lines */}
-                <div className="space-y-2 pt-1 border-t border-gray-200/60">
+                <div className="space-y-3 pt-2 border-t border-gray-200/60">
                   <div className="flex items-center justify-between">
-                    <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider flex items-center gap-1">
-                      <Home className="w-3 h-3 text-orange-600" />
+                    <span className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
+                      <Home className="w-3.5 h-3.5 text-orange-600" />
                       Home / Contact Address
-                    </label>
+                    </span>
                     {savedProfile && (
                       <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
                         ✓ Profile Loaded
@@ -541,58 +541,73 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                   </div>
 
                   {/* State & City first */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider">
+                        State <span className="text-red-500 font-bold">*</span>
+                      </label>
                       <input
                         type="text"
                         value={citizenAddress.state}
                         onChange={(e) => setCitizenAddressField('state', e.target.value)}
-                        placeholder="State *"
+                        placeholder="e.g., Delhi, Maharashtra"
                         className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
                       />
                     </div>
-                    <div>
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider">
+                        City / District <span className="text-red-500 font-bold">*</span>
+                      </label>
                       <input
                         type="text"
                         value={citizenAddress.city}
                         onChange={(e) => setCitizenAddressField('city', e.target.value)}
-                        placeholder="City / District *"
+                        placeholder="e.g., New Delhi, Mumbai"
                         className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
                       />
                     </div>
                   </div>
 
                   {/* Pincode & House No */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider">
+                        Pincode / ZIP <span className="text-red-500 font-bold">*</span>
+                      </label>
                       <input
                         type="text"
                         inputMode="numeric"
                         maxLength={6}
                         value={citizenAddress.pincode}
                         onChange={(e) => setCitizenAddressField('pincode', e.target.value.replace(/\D/g, ''))}
-                        placeholder="Pincode / ZIP *"
+                        placeholder="e.g., 110024"
                         className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
                       />
                     </div>
-                    <div>
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider">
+                        Address Line 1 - House / Flat No. <span className="text-gray-400 font-normal normal-case">(Optional)</span>
+                      </label>
                       <input
                         type="text"
                         value={citizenAddress.houseNo}
                         onChange={(e) => setCitizenAddressField('houseNo', e.target.value)}
-                        placeholder="Address Line 1 - House / Flat / Building No. (Optional)"
+                        placeholder="e.g., Flat 301, 42-B"
                         className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
                       />
                     </div>
                   </div>
 
                   {/* Address Line 2 */}
-                  <div>
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider">
+                      Address Line 2 - Street / Area / Landmark
+                    </label>
                     <input
                       type="text"
                       value={citizenAddress.street}
                       onChange={(e) => setCitizenAddressField('street', e.target.value)}
-                      placeholder="Address Line 2 - Street / Area / Colony / Landmark"
+                      placeholder="e.g., MG Road, Near Central Park"
                       className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
                     />
                   </div>
@@ -754,53 +769,88 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                     {detectingComplaintGps ? 'Detecting GPS…' : 'Use My GPS'}
                   </button>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    value={complaintLocation.state}
-                    onChange={(e) => setComplaintField('state', e.target.value)}
-                    placeholder="State *"
-                    className="px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
-                  />
-                  <input
-                    type="text"
-                    value={complaintLocation.city}
-                    onChange={(e) => setComplaintField('city', e.target.value)}
-                    placeholder="City / District *"
-                    className="px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
-                  />
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={6}
-                    value={complaintLocation.pincode}
-                    onChange={(e) => setComplaintField('pincode', e.target.value.replace(/\D/g, ''))}
-                    placeholder="Pincode / ZIP *"
-                    className="px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
-                  />
-                  <input
-                    type="text"
-                    value={complaintLocation.houseNo}
-                    onChange={(e) => setComplaintField('houseNo', e.target.value)}
-                    placeholder="House / Flat No. (Optional)"
-                    className="px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
-                  />
-                  <input
-                    type="text"
-                    value={complaintLocation.building}
-                    onChange={(e) => setComplaintField('building', e.target.value)}
-                    placeholder="Building / Society (Optional)"
-                    className="px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
-                  />
-                  <input
-                    type="text"
-                    value={complaintLocation.street}
-                    onChange={(e) => setComplaintField('street', e.target.value)}
-                    placeholder="Street / Road / Landmark *"
-                    className={`px-3 py-2 text-xs bg-white border rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500 ${
-                      errors.complaintAddress ? 'border-red-400 bg-red-50/20' : 'border-gray-200'
-                    }`}
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider">
+                      State <span className="text-red-500 font-bold">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={complaintLocation.state}
+                      onChange={(e) => setComplaintField('state', e.target.value)}
+                      placeholder="e.g., Delhi, Maharashtra"
+                      className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider">
+                      City / District <span className="text-red-500 font-bold">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={complaintLocation.city}
+                      onChange={(e) => setComplaintField('city', e.target.value)}
+                      placeholder="e.g., New Delhi, Mumbai"
+                      className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider">
+                      Pincode / ZIP <span className="text-red-500 font-bold">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      value={complaintLocation.pincode}
+                      onChange={(e) => setComplaintField('pincode', e.target.value.replace(/\D/g, ''))}
+                      placeholder="e.g., 110024"
+                      className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider">
+                      Street / Road / Landmark <span className="text-red-500 font-bold">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={complaintLocation.street}
+                      onChange={(e) => setComplaintField('street', e.target.value)}
+                      placeholder="e.g., MG Road, Near Metro Pillar 142"
+                      className={`w-full px-3 py-2 text-xs bg-white border rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500 ${
+                        errors.complaintAddress ? 'border-red-400 bg-red-50/20' : 'border-gray-200'
+                      }`}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider">
+                      House / Flat No. <span className="text-gray-400 font-normal normal-case">(Optional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={complaintLocation.houseNo}
+                      onChange={(e) => setComplaintField('houseNo', e.target.value)}
+                      placeholder="e.g., 42-B, Shop 5 (Optional)"
+                      className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider">
+                      Building / Society <span className="text-gray-400 font-normal normal-case">(Optional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={complaintLocation.building}
+                      onChange={(e) => setComplaintField('building', e.target.value)}
+                      placeholder="e.g., Metro Station, Block C (Optional)"
+                      className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
+                    />
+                  </div>
                 </div>
                 <div className="px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl text-gray-600 font-mono flex items-center justify-center">
                   GPS: {latitude}, {longitude}
