@@ -382,14 +382,13 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
             {/* ── 3. Address Line 1 (House / Flat / Building) ── */}
             <Field
-              label="Address Line 1 - House / Flat / Building No."
-              required
+              label="Address Line 1 - House / Flat / Building No. (Optional)"
               icon={<Hash className="w-3 h-3" />}
               error={errors.houseNo}
             >
               <input
                 type="text"
-                placeholder="e.g., Flat 301, 42-B, Green Apartments"
+                placeholder="e.g., Flat 301, 42-B, Green Apartments (Optional)"
                 value={addr.houseNo}
                 onChange={(e) => setField('houseNo', e.target.value)}
                 className={inputCls(!!errors.houseNo)}

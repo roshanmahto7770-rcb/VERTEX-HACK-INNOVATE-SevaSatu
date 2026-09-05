@@ -333,9 +333,13 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
     if (!selectedImage) {
       newErrors.image = 'Photo evidence is required. Please upload or select an image.';
     }
-    const complaintAddress = formatAddress(complaintLocation);
-    if (!complaintAddress.trim()) {
-      newErrors.complaintAddress = 'Please specify the location where the issue is occurring.';
+    if (
+      !complaintLocation.state.trim() ||
+      !complaintLocation.city.trim() ||
+      !complaintLocation.pincode.trim() ||
+      !complaintLocation.street.trim()
+    ) {
+      newErrors.complaintAddress = 'Please fill required location fields (State *, City *, Pincode *, and Street/Road *).';
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -576,7 +580,7 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                         type="text"
                         value={citizenAddress.houseNo}
                         onChange={(e) => setCitizenAddressField('houseNo', e.target.value)}
-                        placeholder="Address Line 1 - House / Flat / Building No. *"
+                        placeholder="Address Line 1 - House / Flat / Building No. (Optional)"
                         className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
                       />
                     </div>
@@ -778,14 +782,14 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                     type="text"
                     value={complaintLocation.houseNo}
                     onChange={(e) => setComplaintField('houseNo', e.target.value)}
-                    placeholder="House / Flat / Building No. *"
+                    placeholder="House / Flat No. (Optional)"
                     className="px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
                   />
                   <input
                     type="text"
                     value={complaintLocation.building}
                     onChange={(e) => setComplaintField('building', e.target.value)}
-                    placeholder="Building / Society / Colony"
+                    placeholder="Building / Society (Optional)"
                     className="px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
                   />
                   <input
