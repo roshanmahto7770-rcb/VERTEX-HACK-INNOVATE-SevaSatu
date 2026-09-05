@@ -6,6 +6,10 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const department = searchParams.get('department');
     const status = searchParams.get('status');
+    const state = searchParams.get('state');
+    const city = searchParams.get('city');
+    const pincode = searchParams.get('pincode');
+    const search = searchParams.get('search');
     const sortBy = searchParams.get('sortBy') || 'priority';
 
     let grievances = mockDb.getAllGrievances();
@@ -25,6 +29,48 @@ export async function GET(req: NextRequest) {
     if (status && status !== 'All' && status !== 'all') {
       grievances = grievances.filter((g) => g.status === status);
       masterComplaints = masterComplaints.filter((m) => m.status === status);
+    }
+
+    // State filter
+    if (state && state !== 'All') {
+      const q = state.toLowerCase();
+      grievances = grievances.filter(
+        (g) =>
+          g.locationDetails?.state?.toLowerCase().includes(q) ||
+          g.addressText.toLowerCase().includes(q)
+      );
+    }
+
+    // City filter
+    if (city && city !== 'All') {
+      const q = city.toLowerCase();
+      grievances = grievances.filter(
+        (g) =>
+          g.locationDetails?.city?.toLowerCase().includes(q) ||
+          g.addressText.toLowerCase().includes(q)
+      );
+    }
+
+    // Pincode filter
+    if (pincode) {
+      grievances = grievances.filter(
+        (g) =>
+          g.locationDetails?.pincode === pincode ||
+          g.addressText.includes(pincode)
+      );
+    }
+
+    // Search query
+    if (search) {
+      const q = search.toLowerCase();
+      grievances = grievances.filter(
+        (g) =>
+          g.ticketNumber.toLowerCase().includes(q) ||
+          g.issueTitle.toLowerCase().includes(q) ||
+          g.description.toLowerCase().includes(q) ||
+          (g.citizenName && g.citizenName.toLowerCase().includes(q)) ||
+          g.addressText.toLowerCase().includes(q)
+      );
     }
 
     // Sort order: Priority (High - Low) by default

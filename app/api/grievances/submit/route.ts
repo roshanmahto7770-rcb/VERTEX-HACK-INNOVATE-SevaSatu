@@ -19,10 +19,23 @@ export async function POST(req: NextRequest) {
       addressText = 'MG Road, Delhi',
       citizenPhone = '+91 98765 43210',
       citizenName = 'Citizen Reporter',
+      citizenAddress,
+      complaintLocation,
     } = payload;
 
     // Combine text inputs
     const combinedText = [title, description].filter(Boolean).join('. ');
+
+    // Auto-save citizen profile if address provided
+    if (citizenAddress && citizenName && citizenPhone) {
+      mockDb.saveCitizenProfile({
+        name: citizenName,
+        phone: citizenPhone,
+        address: citizenAddress,
+        savedLat: latitude,
+        savedLng: longitude,
+      });
+    }
 
     // 1. Multimodal Gemini Triage Pipeline
     const triageResult = await triageGrievance({
@@ -104,6 +117,7 @@ export async function POST(req: NextRequest) {
       citizenId: `user-${Date.now()}`,
       citizenName,
       citizenPhone,
+      citizenAddress,
       masterComplaintId: masterTicket ? masterTicket.id : null,
       issueTitle: triageResult.issue_title,
       description: triageResult.summary || description,
@@ -113,6 +127,7 @@ export async function POST(req: NextRequest) {
       latitude,
       longitude,
       addressText,
+      locationDetails: complaintLocation,
       priorityScore: triageResult.severity_score,
       severityLevel: triageResult.severity_level,
       severityReasoning: triageResult.severity_reasoning,
@@ -146,6 +161,7 @@ export async function POST(req: NextRequest) {
           latitude,
           longitude,
           addressText,
+          locationDetails: complaintLocation,
         },
         complaintCount: 1,
         aiSummary: triageResult.summary,

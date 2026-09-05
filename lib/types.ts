@@ -20,10 +20,32 @@ export interface User {
   avatarUrl?: string;
 }
 
+export interface StructuredAddress {
+  houseNo?: string;     // House / Flat / Building No. (Optional)
+  building?: string;    // Building / Society / Colony (Optional)
+  street: string;       // Street / Road / Area / Landmark
+  city: string;         // City / District
+  state: string;        // State
+  pincode: string;      // 6-digit PIN code
+}
+
+export interface CitizenProfile {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  address: StructuredAddress;
+  savedLat?: number;
+  savedLng?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface GeolocationPoint {
   latitude: number;
   longitude: number;
   addressText: string;
+  structuredAddress?: StructuredAddress;
 }
 
 export interface Grievance {
@@ -32,6 +54,7 @@ export interface Grievance {
   citizenId?: string;
   citizenName?: string;
   citizenPhone?: string;
+  citizenAddress?: StructuredAddress;
   masterComplaintId?: string | null;
   issueTitle: string;
   description: string;
@@ -42,6 +65,7 @@ export interface Grievance {
   latitude: number;
   longitude: number;
   addressText: string;
+  locationDetails?: StructuredAddress;
   priorityScore: number; // 1 - 10
   severityLevel: SeverityLevel;
   severityReasoning?: string;
@@ -71,6 +95,7 @@ export interface MasterComplaint {
     latitude: number;
     longitude: number;
     addressText: string;
+    locationDetails?: StructuredAddress;
   };
   complaintCount: number;
   aiSummary: string;
@@ -129,4 +154,19 @@ export interface GrievanceSubmissionPayload {
   addressText?: string;
   citizenPhone?: string;
   citizenName?: string;
+  citizenAddress?: StructuredAddress;
+  complaintLocation?: StructuredAddress;
+}
+
+export interface OfficerStats {
+  totalGrievances: number;
+  resolvedGrievances: number;
+  pendingGrievances: number;
+  inProgressGrievances: number;
+  activeMasterClusters: number;
+  criticalCases: number;
+  avgResolutionHours: number;
+  cityBreakdown: Record<string, number>;
+  stateBreakdown: Record<string, number>;
+  departmentBreakdown: Record<string, number>;
 }

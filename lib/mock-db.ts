@@ -1,4 +1,12 @@
-import { Grievance, MasterComplaint, StatusLog, ComplaintStatus } from './types';
+import {
+  Grievance,
+  MasterComplaint,
+  StatusLog,
+  ComplaintStatus,
+  CitizenProfile,
+  StructuredAddress,
+  OfficerStats,
+} from './types';
 
 // Haversine formula to compute great-circle distance between two GPS coordinates in meters
 export function calculateDistanceMeters(
@@ -36,6 +44,7 @@ class MockDatabase {
   private grievances: Grievance[] = [];
   private masterComplaints: MasterComplaint[] = [];
   private statusLogs: StatusLog[] = [];
+  private citizenProfiles: CitizenProfile[] = [];
 
   constructor() {
     this.seedInitialData();
@@ -459,6 +468,161 @@ class MockDatabase {
     });
 
     return g;
+  }
+
+  public getGrievances(filters?: {
+    department?: string;
+    category?: string;
+    status?: string;
+    state?: string;
+    city?: string;
+    pincode?: string;
+    search?: string;
+  }): Grievance[] {
+    let list = [...this.grievances];
+    if (!filters) return list;
+
+    if (filters.department && filters.department !== 'ALL') {
+      list = list.filter((g) => g.department === filters.department);
+    }
+    if (filters.category && filters.category !== 'ALL') {
+      list = list.filter((g) => g.category === filters.category);
+    }
+    if (filters.status && filters.status !== 'ALL') {
+      list = list.filter((g) => g.status === filters.status);
+    }
+    if (filters.state) {
+      const q = filters.state.toLowerCase();
+      list = list.filter(
+        (g) =>
+          g.locationDetails?.state?.toLowerCase().includes(q) ||
+          g.addressText.toLowerCase().includes(q)
+      );
+    }
+    if (filters.city) {
+      const q = filters.city.toLowerCase();
+      list = list.filter(
+        (g) =>
+          g.locationDetails?.city?.toLowerCase().includes(q) ||
+          g.addressText.toLowerCase().includes(q)
+      );
+    }
+    if (filters.pincode) {
+      list = list.filter(
+        (g) =>
+          g.locationDetails?.pincode === filters.pincode ||
+          g.addressText.includes(filters.pincode!)
+      );
+    }
+    if (filters.search) {
+      const q = filters.search.toLowerCase();
+      list = list.filter(
+        (g) =>
+          g.ticketNumber.toLowerCase().includes(q) ||
+          g.issueTitle.toLowerCase().includes(q) ||
+          g.description.toLowerCase().includes(q) ||
+          (g.citizenName && g.citizenName.toLowerCase().includes(q)) ||
+          g.addressText.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }
+
+  // ── Citizen Profile Persistence ──────────────────────────────────────────
+  public saveCitizenProfile(data: {
+    name: string;
+    phone: string;
+    email?: string;
+    address: StructuredAddress;
+    savedLat?: number;
+    savedLng?: number;
+  }): CitizenProfile {
+    const existingIdx = this.citizenProfiles.findIndex(
+      (p) => p.phone === data.phone || (data.email && p.email === data.email)
+    );
+
+    const now = new Date().toISOString();
+    if (existingIdx >= 0) {
+      const updated: CitizenProfile = {
+        ...this.citizenProfiles[existingIdx],
+        name: data.name,
+        phone: data.phone,
+        email: data.email || this.citizenProfiles[existingIdx].email,
+        address: data.address,
+        savedLat: data.savedLat ?? this.citizenProfiles[existingIdx].savedLat,
+        savedLng: data.savedLng ?? this.citizenProfiles[existingIdx].savedLng,
+        updatedAt: now,
+      };
+      this.citizenProfiles[existingIdx] = updated;
+      return updated;
+    }
+
+    const newProfile: CitizenProfile = {
+      id: `cit-${Date.now()}`,
+      name: data.name,
+      phone: data.phone,
+      email: data.email,
+      address: data.address,
+      savedLat: data.savedLat,
+      savedLng: data.savedLng,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.citizenProfiles.unshift(newProfile);
+    return newProfile;
+  }
+
+  public getCitizenProfileByPhone(phone: string): CitizenProfile | null {
+    if (!phone) return null;
+    const clean = phone.replace(/\D/g, '');
+    return (
+      this.citizenProfiles.find(
+        (p) => p.phone.replace(/\D/g, '') === clean || p.phone === phone
+      ) || null
+    );
+  }
+
+  // ── Officer Analytics & Stats ────────────────────────────────────────────
+  public getStats(): OfficerStats {
+    const total = this.grievances.length;
+    const resolved = this.grievances.filter((g) => g.status === 'Resolved').length;
+    const pending = this.grievances.filter(
+      (g) => g.status === 'Pending_Verification' || g.status === 'Linked_To_Master'
+    ).length;
+    const inProgress = this.grievances.filter(
+      (g) => g.status === 'In_Progress' || g.status === 'Assigned'
+    ).length;
+    const critical = this.grievances.filter((g) => g.severityLevel === 'Critical').length;
+    const clusters = this.masterComplaints.filter(
+      (m) => m.status !== 'Resolved' && m.status !== 'Rejected'
+    ).length;
+
+    const cityBreakdown: Record<string, number> = {};
+    const stateBreakdown: Record<string, number> = {};
+    const departmentBreakdown: Record<string, number> = {};
+
+    for (const g of this.grievances) {
+      const city = g.locationDetails?.city || 'Delhi';
+      const state = g.locationDetails?.state || 'Delhi';
+      const dept = g.department || 'General';
+
+      cityBreakdown[city] = (cityBreakdown[city] || 0) + 1;
+      stateBreakdown[state] = (stateBreakdown[state] || 0) + 1;
+      departmentBreakdown[dept] = (departmentBreakdown[dept] || 0) + 1;
+    }
+
+    return {
+      totalGrievances: total,
+      resolvedGrievances: resolved,
+      pendingGrievances: pending,
+      inProgressGrievances: inProgress,
+      activeMasterClusters: clusters,
+      criticalCases: critical,
+      avgResolutionHours: 14.5,
+      cityBreakdown,
+      stateBreakdown,
+      departmentBreakdown,
+    };
   }
 
   public getStatusLogs(targetId: string): StatusLog[] {
