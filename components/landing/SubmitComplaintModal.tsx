@@ -333,13 +333,20 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
     if (!selectedImage) {
       newErrors.image = 'Photo evidence is required. Please upload or select an image.';
     }
+
+    const complaintAddress =
+      formatAddress(complaintLocation) ||
+      [complaintLocation.street, complaintLocation.city, complaintLocation.state, complaintLocation.pincode]
+        .filter(Boolean)
+        .join(', ');
+
     if (
       !complaintLocation.state.trim() ||
       !complaintLocation.city.trim() ||
       !complaintLocation.pincode.trim() ||
       !complaintLocation.street.trim()
     ) {
-      newErrors.complaintAddress = 'Please fill required location fields (State *, City *, Pincode *, and Street/Road *).';
+      newErrors.complaintAddress = 'Please fill required location fields (State, City, Pincode, and Street/Road).';
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -375,6 +382,8 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
           addressText: complaintAddress.trim(),
           citizenPhone: citizenPhone || '+91 00000 00000',
           citizenName: citizenName || 'Citizen Reporter',
+          citizenAddress,
+          complaintLocation,
         }),
       });
 
