@@ -23,6 +23,7 @@ import {
 import { GeminiTriageOutput, Grievance, MasterComplaint } from '@/lib/types';
 import {
   getSavedProfile,
+  saveProfile,
   UserProfile,
   StructuredAddress,
   formatAddress,
@@ -104,12 +105,41 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
   const [description, setDescription] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
-  // ── Citizen identity (auto-filled from profile) ────────────────────────────
+  // ── Citizen identity & structured address (auto-filled from profile) ───────
   const [citizenName, setCitizenName] = useState('');
   const [citizenPhone, setCitizenPhone] = useState('');
+  const [citizenAddress, setCitizenAddress] = useState<StructuredAddress>(emptyComplaintLocation());
+  const [detectingCitizenGps, setDetectingCitizenGps] = useState(false);
+  const [saveToProfile, setSaveToProfile] = useState(true);
 
-  // ── User's own saved address (from profile — structured) ─────────────────
-  const [userAddress, setUserAddress] = useState('');  // formatted display string
+  const setCitizenAddressField = (field: keyof StructuredAddress, value: string) => {
+    setCitizenAddress((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleDetectCitizenLocation = () => {
+    if (!navigator.geolocation) return;
+    setDetectingCitizenGps(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = Number(pos.coords.latitude.toFixed(6));
+        const lng = Number(pos.coords.longitude.toFixed(6));
+        const geocoded = await reverseGeocode(lat, lng);
+        setCitizenAddress((prev) => ({
+          state: geocoded.state ?? prev.state,
+          city: geocoded.city ?? prev.city,
+          pincode: geocoded.pincode ?? prev.pincode,
+          houseNo: geocoded.houseNo ?? prev.houseNo,
+          building: geocoded.building ?? prev.building,
+          street: geocoded.street ?? prev.street,
+        }));
+        setDetectingCitizenGps(false);
+      },
+      () => {
+        setDetectingCitizenGps(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
 
   // ── Complaint location (where the issue actually is) ───────────────────────
   const [complaintLocation, setComplaintLocation] = useState<StructuredAddress>(emptyComplaintLocation());
@@ -157,14 +187,13 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
       const profile = getSavedProfile();
       setSavedProfile(profile);
       if (profile) {
-        setCitizenName(profile.name);
-        setCitizenPhone(profile.phone);
-        // Build formatted display string from structured address
-        setUserAddress(profile.address ? formatAddress(profile.address) : '');
+        setCitizenName(profile.name || '');
+        setCitizenPhone(profile.phone || '');
+        setCitizenAddress(profile.address || emptyComplaintLocation());
       } else {
         setCitizenName('');
         setCitizenPhone('');
-        setUserAddress('');
+        setCitizenAddress(emptyComplaintLocation());
       }
     }
   }, [isOpen]);
@@ -351,6 +380,18 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
         throw new Error(data.rejectionReason || data.error || 'Submission failed');
       }
 
+      if (saveToProfile && citizenName.trim()) {
+        const prof: UserProfile = {
+          name: citizenName.trim(),
+          phone: citizenPhone.trim(),
+          address: citizenAddress,
+          savedLat: latitude,
+          savedLng: longitude,
+        };
+        saveProfile(prof);
+        setSavedProfile(prof);
+      }
+
       setResult(data);
       if (onSuccess) {
         onSuccess(data.grievance, data.masterTicket);
@@ -433,47 +474,42 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
           {!result && !isFinalSuccess && (
             <form onSubmit={handleSubmit} className="space-y-5">
 
-              {/* ── CITIZEN IDENTITY (pre-filled from profile) ─────────────── */}
+              {/* ── CITIZEN IDENTITY & ADDRESS (Structured) ─────────────── */}
               <div className="p-4 bg-slate-50 border border-gray-200 rounded-2xl space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-gray-600 uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
                     <User className="w-3.5 h-3.5 text-orange-600" />
                     Citizen Details
                   </span>
-                  {!savedProfile && (
-                    <button
-                      type="button"
-                      onClick={onOpenProfileModal}
-                      className="text-[11px] text-orange-600 font-semibold hover:underline cursor-pointer"
-                    >
-                      + Set up profile to auto-fill
-                    </button>
-                  )}
-                  {savedProfile && (
-                    <button
-                      type="button"
-                      onClick={onOpenProfileModal}
-                      className="text-[11px] text-gray-400 font-semibold hover:text-orange-600 cursor-pointer"
-                    >
-                      ✏️ Edit Profile
-                    </button>
-                  )}
+                  
+                  {/* GPS Auto-detect Button for Citizen Address */}
+                  <button
+                    type="button"
+                    onClick={handleDetectCitizenLocation}
+                    disabled={detectingCitizenGps}
+                    className="text-xs font-bold text-orange-600 hover:text-orange-700 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-50 border border-orange-200 shadow-2xs hover:bg-orange-100 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${detectingCitizenGps ? 'animate-spin' : ''}`} />
+                    {detectingCitizenGps ? 'Fetching GPS…' : '📍 Auto-detect My Location'}
+                  </button>
                 </div>
+
+                {/* 1. Name & Mobile */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-[10px] font-semibold text-gray-500 mb-1 uppercase tracking-wider">
-                      Your Name
+                    <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase tracking-wider">
+                      Your Name <span className="text-red-500 font-bold">*</span>
                     </label>
                     <input
                       type="text"
                       value={citizenName}
                       onChange={(e) => setCitizenName(e.target.value)}
-                      placeholder="Full name"
-                      className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+                      placeholder="e.g., Roshan Kumar"
+                      className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-gray-500 mb-1 uppercase tracking-wider">
+                    <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase tracking-wider">
                       Mobile Number
                     </label>
                     <input
@@ -481,50 +517,92 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                       value={citizenPhone}
                       onChange={(e) => setCitizenPhone(e.target.value)}
                       placeholder="+91 98765 43210"
-                      className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+                      className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
                     />
                   </div>
                 </div>
 
-                {/* User's Saved Home Address — structured read-only display */}
-                <div>
-                  <label className="block text-[10px] font-semibold text-gray-500 mb-1.5 uppercase tracking-wider flex items-center gap-1">
-                    <Home className="w-3 h-3" />
-                    Your Home / Office Address
-                    <span className="text-gray-400 font-normal">(for officer contact)</span>
-                  </label>
+                {/* 2. Structured Address: State -> City -> Pincode -> Address Lines */}
+                <div className="space-y-2 pt-1 border-t border-gray-200/60">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider flex items-center gap-1">
+                      <Home className="w-3 h-3 text-orange-600" />
+                      Home / Contact Address
+                    </label>
+                    {savedProfile && (
+                      <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                        ✓ Profile Loaded
+                      </span>
+                    )}
+                  </div>
 
-                  {savedProfile && savedProfile.address ? (
-                    // Structured address pill-grid from saved profile
-                    <div className="bg-white border border-gray-200 rounded-xl p-3 space-y-2">
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                        <div><span className="text-gray-400">State: </span><span className="font-semibold text-gray-800">{savedProfile.address.state}</span></div>
-                        <div><span className="text-gray-400">City: </span><span className="font-semibold text-gray-800">{savedProfile.address.city}</span></div>
-                        <div><span className="text-gray-400">Pincode: </span><span className="font-semibold text-gray-800 font-mono">{savedProfile.address.pincode}</span></div>
-                        {savedProfile.address.houseNo && (
-                          <div><span className="text-gray-400">House/Flat: </span><span className="font-semibold text-gray-800">{savedProfile.address.houseNo}</span></div>
-                        )}
-                        {savedProfile.address.building && (
-                          <div><span className="text-gray-400">Building: </span><span className="font-semibold text-gray-800">{savedProfile.address.building}</span></div>
-                        )}
-                        {savedProfile.address.street && (
-                          <div className="col-span-2"><span className="text-gray-400">Street: </span><span className="font-semibold text-gray-800">{savedProfile.address.street}</span></div>
-                        )}
-                      </div>
-                      <p className="text-[10px] text-emerald-600 font-semibold border-t border-gray-100 pt-1.5">
-                        ✓ Auto-filled from your saved profile
-                      </p>
+                  {/* State & City first */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <input
+                        type="text"
+                        value={citizenAddress.state}
+                        onChange={(e) => setCitizenAddressField('state', e.target.value)}
+                        placeholder="State *"
+                        className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
+                      />
                     </div>
-                  ) : (
-                    // Fallback plain input when no profile set
+                    <div>
+                      <input
+                        type="text"
+                        value={citizenAddress.city}
+                        onChange={(e) => setCitizenAddressField('city', e.target.value)}
+                        placeholder="City / District *"
+                        className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Pincode & House No */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={citizenAddress.pincode}
+                        onChange={(e) => setCitizenAddressField('pincode', e.target.value.replace(/\D/g, ''))}
+                        placeholder="Pincode / ZIP *"
+                        className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
+                      />
+                    </div>
+                    <div>
+                      <input
+                        type="text"
+                        value={citizenAddress.houseNo}
+                        onChange={(e) => setCitizenAddressField('houseNo', e.target.value)}
+                        placeholder="Address Line 1 - House / Flat / Building No. *"
+                        className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Address Line 2 */}
+                  <div>
                     <input
                       type="text"
-                      value={userAddress}
-                      onChange={(e) => setUserAddress(e.target.value)}
-                      placeholder="e.g., 42-B, Lajpat Nagar, New Delhi 110024"
-                      className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+                      value={citizenAddress.street}
+                      onChange={(e) => setCitizenAddressField('street', e.target.value)}
+                      placeholder="Address Line 2 - Street / Area / Colony / Landmark"
+                      className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
                     />
-                  )}
+                  </div>
+
+                  {/* Save to Profile toggle */}
+                  <label className="flex items-center gap-2 pt-1 text-[11px] text-gray-600 font-medium cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={saveToProfile}
+                      onChange={(e) => setSaveToProfile(e.target.checked)}
+                      className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                    />
+                    <span>Save to My Profile (auto-fill for future complaints)</span>
+                  </label>
                 </div>
               </div>
 
