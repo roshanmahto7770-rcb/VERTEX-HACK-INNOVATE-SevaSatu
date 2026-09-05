@@ -51,10 +51,18 @@ export const RecentComplaintsTable: React.FC<RecentComplaintsTableProps> = ({
 
   const getStatusText = (status: string) => {
     switch (status) {
+      case 'Pending_Verification':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200 animate-pulse">
+            🤖 Review Req
+          </span>
+        );
       case 'In_Progress':
         return <span className="text-amber-600 font-medium">In Progress</span>;
       case 'Resolved':
         return <span className="text-emerald-600 font-medium">Resolved</span>;
+      case 'Rejected':
+        return <span className="text-red-600 font-medium">Rejected</span>;
       case 'Linked_To_Master':
         return <span className="text-purple-600 font-medium">Clustered</span>;
       case 'Assigned':

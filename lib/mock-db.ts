@@ -282,14 +282,68 @@ class MockDatabase {
       status: 'In_Progress',
       isValidGrievance: true,
       summary: 'Water leakage on road from cracked supply line.',
-      recommendedAction: 'Shut isolation valve and clamp broken segment.',
-      officerComment: 'Valve team deployed to stem pressure.',
-      createdAt: '2025-05-16T07:20:00.000Z',
-      updatedAt: '2025-05-16T07:35:00.000Z',
+    // 9. #C-8891: AI Triaged - Pending Officer Assignment (Exposed Wire)
+    const g6: Grievance = {
+      id: 'c-8891',
+      ticketNumber: '#C-8891',
+      citizenId: 'user-008',
+      citizenName: 'Manish Tiwari',
+      citizenPhone: '+91 98119 88776',
+      masterComplaintId: null,
+      issueTitle: 'Exposed live wire hanging near school gate',
+      description: 'Sparking high-voltage live wire hanging less than 5 feet from the ground near school entrance. Kids pass right underneath.',
+      imageUrl: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=600&auto=format&fit=crop&q=80',
+      attachments: ['https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=600&auto=format&fit=crop&q=80'],
+      detectedLanguage: 'English',
+      latitude: 28.6139,
+      longitude: 77.2090,
+      addressText: 'Connaught Place, Delhi',
+      priorityScore: 9,
+      severityLevel: 'Critical',
+      severityReasoning: 'Critical electrocution danger to schoolchildren and pedestrians. AI recommends urgent dispatch to BSES Electricity Board.',
+      department: 'BSES / Electricity Board',
+      category: 'Street Light',
+      status: 'Pending_Verification',
+      isValidGrievance: true,
+      summary: 'Sparking high-voltage live wire hanging near school gate.',
+      recommendedAction: 'AI Proposal: Assign to BSES / Electricity Board & isolate transformer feeder.',
+      officerComment: 'Awaiting Officer Review & Assignment Authorization.',
+      createdAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+      updatedAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+    };
+
+    // 10. #C-8892: AI Triaged - Pending Officer Review (Suspected Spam / Reject Proposal)
+    const g7: Grievance = {
+      id: 'c-8892',
+      ticketNumber: '#C-8892',
+      citizenId: 'user-009',
+      citizenName: 'Deepak Sharma',
+      citizenPhone: '+91 97110 33445',
+      masterComplaintId: null,
+      issueTitle: 'Noisy street vendors in market',
+      description: 'Vendors are shouting loudly in evening market. Please send police.',
+      imageUrl: 'https://images.unsplash.com/photo-1605600659908-0ef719419d41?w=600&auto=format&fit=crop&q=80',
+      attachments: ['https://images.unsplash.com/photo-1605600659908-0ef719419d41?w=600&auto=format&fit=crop&q=80'],
+      detectedLanguage: 'English',
+      latitude: 28.6500,
+      longitude: 77.2300,
+      addressText: 'Chandni Chowk, Delhi',
+      priorityScore: 3,
+      severityLevel: 'Low',
+      severityReasoning: 'Non-civic municipal infrastructure grievance. AI recommends declining or routing to Local Police.',
+      department: 'Municipal Corporation of Delhi (MCD)',
+      category: 'Garbage',
+      status: 'Pending_Verification',
+      isValidGrievance: false,
+      summary: 'Non-infrastructure noise complaint in commercial market.',
+      recommendedAction: 'AI Proposal: Decline / Reject - Route to Local Police helpline 112.',
+      officerComment: 'Awaiting Officer Confirmation to Reject.',
+      createdAt: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
+      updatedAt: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
     };
 
     this.masterComplaints = [master1];
-    this.grievances = [g1, g2, g3, g4, g5, g1b, g1c];
+    this.grievances = [g6, g7, g1, g2, g3, g4, g5, g1b, g1c];
 
     this.statusLogs = [
       {
