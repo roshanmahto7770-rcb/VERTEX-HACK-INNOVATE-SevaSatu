@@ -1,7 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import Link from 'next/link';
+import React, { useState, useRef } from 'react';
 import {
   X,
   Camera,
@@ -14,10 +13,9 @@ import {
   Loader2,
   RefreshCw,
   Layers,
-  ArrowLeft,
   ArrowRight,
-  LayoutDashboard,
   FileCheck,
+  RotateCcw,
 } from 'lucide-react';
 import { GeminiTriageOutput, Grievance, MasterComplaint } from '@/lib/types';
 
@@ -107,9 +105,10 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
     clusterReasoning?: string;
     triage: GeminiTriageOutput;
   } | null>(null);
+  const [isFinalSuccess, setIsFinalSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Reset form completely
+  // Reset form completely so next submission starts fresh
   const handleResetForm = () => {
     setTitle('');
     setDescription('');
@@ -117,11 +116,12 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
     setErrors({});
     setErrorMsg(null);
     setResult(null);
+    setIsFinalSuccess(false);
     setIsRecording(false);
     if (timerRef.current) clearInterval(timerRef.current);
   };
 
-  // When modal closes, reset so reopening starts fresh
+  // Close modal and reset
   const handleCloseModal = () => {
     handleResetForm();
     onClose();
@@ -221,6 +221,7 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
     setIsAnalyzing(true);
     setErrorMsg(null);
     setResult(null);
+    setIsFinalSuccess(false);
 
     try {
       setAnalysisPhase('Invoking Gemini 2.5 Flash Multimodal Vision & Triage...');
@@ -293,30 +294,32 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
 
         {/* Modal Body */}
         <div className="p-6 max-h-[82vh] overflow-y-auto space-y-6">
-          {/* Quick Demo Test Presets */}
-          <div className="p-3.5 bg-orange-50/70 rounded-2xl border border-orange-100 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-orange-900 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-orange-600" />
-                Quick Test Samples:
-              </span>
-              <span className="text-[11px] text-orange-700 font-medium">
-                Click to autofill all required fields (*)
-              </span>
+          {/* Quick Demo Test Presets (Only shown when on form) */}
+          {!result && !isFinalSuccess && (
+            <div className="p-3.5 bg-orange-50/70 rounded-2xl border border-orange-100 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-orange-900 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-orange-600" />
+                  Quick Test Samples:
+                </span>
+                <span className="text-[11px] text-orange-700 font-medium">
+                  Click to autofill all required fields (*)
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {SAMPLE_PRESETS.map((preset, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => applyPreset(preset)}
+                    className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white hover:bg-orange-100 text-gray-700 hover:text-orange-900 border border-orange-200/80 shadow-2xs transition-colors cursor-pointer"
+                  >
+                    {preset.name}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {SAMPLE_PRESETS.map((preset, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => applyPreset(preset)}
-                  className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white hover:bg-orange-100 text-gray-700 hover:text-orange-900 border border-orange-200/80 shadow-2xs transition-colors cursor-pointer"
-                >
-                  {preset.name}
-                </button>
-              ))}
-            </div>
-          </div>
+          )}
 
           {/* Error Banner */}
           {errorMsg && (
@@ -326,8 +329,8 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
             </div>
           )}
 
-          {/* Form View (when no result yet) */}
-          {!result ? (
+          {/* STATE 1: INPUT FORM */}
+          {!result && !isFinalSuccess && (
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Mandatory Notice */}
               <div className="text-[11px] text-gray-500 flex items-center gap-1">
@@ -512,10 +515,12 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                 </button>
               </div>
             </form>
-          ) : (
-            /* SUCCESS CONFIRMATION & TRIAGE RESULT VIEW */
+          )}
+
+          {/* STATE 2: AI TRIAGE & MASTER CLUSTER OUTPUT VIEW */}
+          {result && !isFinalSuccess && (
             <div className="space-y-5 animate-in fade-in duration-300">
-              {/* Big Success Banner */}
+              {/* Header Banner */}
               <div className="p-4 sm:p-5 rounded-2xl bg-emerald-50 border-2 border-emerald-300 text-emerald-950 space-y-2">
                 <div className="flex items-center gap-2.5">
                   <div className="w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
@@ -523,10 +528,10 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                   </div>
                   <div>
                     <h4 className="text-base font-black text-emerald-900">
-                      🎉 Complaint Submitted Successfully!
+                      🎉 Complaint Processed & Ready for Confirmation
                     </h4>
                     <p className="text-xs text-emerald-800 font-medium">
-                      Your complaint has been logged and assigned Ticket ID{' '}
+                      Assigned Ticket ID:{' '}
                       <strong className="font-mono text-emerald-950 bg-emerald-200/80 px-2 py-0.5 rounded">
                         {result.grievance.ticketNumber}
                       </strong>
@@ -631,14 +636,114 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                 </div>
               </div>
 
-              {/* Modal Close Action */}
+              {/* Action Button: Click Done to see final confirmation on the SAME page */}
               <div className="pt-4 border-t border-gray-100 flex items-center justify-end">
                 <button
                   type="button"
-                  onClick={handleCloseModal}
+                  onClick={() => setIsFinalSuccess(true)}
                   className="w-full sm:w-auto px-8 py-2.5 text-xs font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-xl shadow-md shadow-orange-600/30 transition-all cursor-pointer"
                 >
                   Done
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STATE 3: FINAL SUCCESS CONFIRMATION ON THE SAME SCREEN */}
+          {isFinalSuccess && result && (
+            <div className="text-center py-8 px-4 space-y-6 animate-in zoom-in-95 duration-200">
+              {/* Celebratory Check Icon */}
+              <div className="w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-inner border-4 border-emerald-200">
+                <CheckCircle2 className="w-12 h-12" />
+              </div>
+
+              <div className="space-y-2">
+                <span className="inline-block px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  Registration Successful
+                </span>
+                <h3 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
+                  🎉 Complaint Submitted Successfully!
+                </h3>
+                <p className="text-xs sm:text-sm text-gray-600 max-w-md mx-auto leading-relaxed">
+                  Your grievance has been officially registered in the municipal portal. Department field officers have been notified for immediate inspection.
+                </p>
+              </div>
+
+              {/* Big Clean Official Receipt Box */}
+              <div className="bg-slate-50/80 border-2 border-emerald-200 rounded-2xl p-5 max-w-md mx-auto space-y-3.5 text-left shadow-xs">
+                <div className="flex items-center justify-between border-b border-gray-200 pb-2.5">
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    Complaint Ticket ID
+                  </span>
+                  <span className="font-mono text-base font-black text-orange-600 bg-orange-100 px-3 py-1 rounded-lg">
+                    {result.grievance.ticketNumber}
+                  </span>
+                </div>
+
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500 font-medium">Issue Title:</span>
+                    <span className="font-bold text-gray-900 max-w-[220px] truncate text-right">
+                      {result.grievance.issueTitle}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-gray-500 font-medium">Assigned Department:</span>
+                    <span className="font-bold text-gray-900 text-right">
+                      {result.triage.department}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-gray-500 font-medium">Category:</span>
+                    <span className="font-bold text-gray-900">
+                      {result.triage.category}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-gray-500 font-medium">Priority Rating:</span>
+                    <span className="font-bold text-red-600">
+                      {result.triage.severity_score}/10 ({result.triage.severity_level})
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-gray-500 font-medium">Location:</span>
+                    <span className="font-bold text-gray-900 max-w-[220px] truncate text-right">
+                      {result.grievance.addressText}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between border-t border-gray-200/80 pt-2">
+                    <span className="text-gray-500 font-medium">Cluster Status:</span>
+                    <span className="font-bold text-purple-700">
+                      {result.isClustered
+                        ? `Grouped with Master ${result.masterTicket.masterTicketNumber}`
+                        : 'Standalone Master Ticket'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons Right on the Same Page */}
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleResetForm}
+                  className="w-full sm:w-auto px-6 py-3 text-xs font-bold text-orange-700 bg-orange-100 hover:bg-orange-200 border border-orange-300 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Submit Another Complaint
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className="w-full sm:w-auto px-8 py-3 text-xs font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-xl shadow-md shadow-orange-600/30 transition-all cursor-pointer"
+                >
+                  Close Window
                 </button>
               </div>
             </div>
