@@ -344,88 +344,70 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               </p>
             )}
 
-            {/* Address Line 1 */}
-            <div>
-              <Field
-                label="Address Line 1 - House / Flat No."
-                required
-                icon={<Hash className="w-3 h-3" />}
-                error={errors.houseNo}
-              >
-                <input
-                  type="text"
-                  placeholder="e.g., 42-B, Flat 301"
-                  value={addr.houseNo}
-                  onChange={(e) => setField('houseNo', e.target.value)}
-                  className={inputCls(!!errors.houseNo)}
-                />
-              </Field>
-
-            </div>
-
-            {/* Address Line 2 */}
-            <Field
-              label="Address Line 2 - Building / Society"
-              icon={<Building2 className="w-3 h-3" />}
-              error={errors.building}
-            >
-              <input
-                type="text"
-                placeholder="e.g., Green Park Apartments"
-                value={addr.building}
-                onChange={(e) => setField('building', e.target.value)}
-                className={inputCls(!!errors.building)}
-              />
-            </Field>
-
-            <Field
-              label="Street / Road / Area"
-              required
-              icon={<Map className="w-3 h-3" />}
-              error={errors.street}
-            >
-              <input
-                type="text"
-                placeholder="e.g., MG Road, Lajpat Nagar Block C"
-                value={addr.street}
-                onChange={(e) => setField('street', e.target.value)}
-                className={inputCls(!!errors.street)}
-              />
-            </Field>
-
-            {/* City and State are separate fields */}
+            {/* ── 1. State & City (First) ── */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Field label="City / District" required error={errors.city}>
-                <input
-                  type="text"
-                  placeholder="e.g., New Delhi"
-                  value={addr.city}
-                  onChange={(e) => setField('city', e.target.value)}
-                  className={inputCls(!!errors.city)}
-                />
-              </Field>
-
               <Field label="State" required error={errors.state}>
                 <input
                   type="text"
-                  placeholder="e.g., Delhi"
+                  placeholder="e.g., Delhi, Maharashtra, Bihar"
                   value={addr.state}
                   onChange={(e) => setField('state', e.target.value)}
                   className={inputCls(!!errors.state)}
                 />
               </Field>
 
+              <Field label="City / District" required error={errors.city}>
+                <input
+                  type="text"
+                  placeholder="e.g., New Delhi, Mumbai, Patna"
+                  value={addr.city}
+                  onChange={(e) => setField('city', e.target.value)}
+                  className={inputCls(!!errors.city)}
+                />
+              </Field>
             </div>
 
+            {/* ── 2. Pincode / ZIP ── */}
             <Field label="Pincode / ZIP" required error={errors.pincode}>
               <input
                 type="text"
                 inputMode="numeric"
                 maxLength={6}
-                placeholder="110024"
+                placeholder="e.g., 110024"
                 value={addr.pincode}
                 onChange={(e) => setField('pincode', e.target.value.replace(/\D/g, ''))}
                 className={inputCls(!!errors.pincode)}
+              />
+            </Field>
+
+            {/* ── 3. Address Line 1 (House / Flat / Building) ── */}
+            <Field
+              label="Address Line 1 - House / Flat / Building No."
+              required
+              icon={<Hash className="w-3 h-3" />}
+              error={errors.houseNo}
+            >
+              <input
+                type="text"
+                placeholder="e.g., Flat 301, 42-B, Green Apartments"
+                value={addr.houseNo}
+                onChange={(e) => setField('houseNo', e.target.value)}
+                className={inputCls(!!errors.houseNo)}
+              />
+            </Field>
+
+            {/* ── 4. Address Line 2 (Street / Colony / Landmark) ── */}
+            <Field
+              label="Address Line 2 - Street / Area / Landmark"
+              icon={<Map className="w-3 h-3" />}
+              error={errors.street}
+            >
+              <input
+                type="text"
+                placeholder="e.g., MG Road, Block C, Near Central Park"
+                value={addr.street}
+                onChange={(e) => setField('street', e.target.value)}
+                className={inputCls(!!errors.street)}
               />
             </Field>
           </div>

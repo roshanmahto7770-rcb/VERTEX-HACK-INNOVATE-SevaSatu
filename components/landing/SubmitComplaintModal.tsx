@@ -498,6 +498,9 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                     // Structured address pill-grid from saved profile
                     <div className="bg-white border border-gray-200 rounded-xl p-3 space-y-2">
                       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                        <div><span className="text-gray-400">State: </span><span className="font-semibold text-gray-800">{savedProfile.address.state}</span></div>
+                        <div><span className="text-gray-400">City: </span><span className="font-semibold text-gray-800">{savedProfile.address.city}</span></div>
+                        <div><span className="text-gray-400">Pincode: </span><span className="font-semibold text-gray-800 font-mono">{savedProfile.address.pincode}</span></div>
                         {savedProfile.address.houseNo && (
                           <div><span className="text-gray-400">House/Flat: </span><span className="font-semibold text-gray-800">{savedProfile.address.houseNo}</span></div>
                         )}
@@ -507,9 +510,6 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                         {savedProfile.address.street && (
                           <div className="col-span-2"><span className="text-gray-400">Street: </span><span className="font-semibold text-gray-800">{savedProfile.address.street}</span></div>
                         )}
-                        <div><span className="text-gray-400">City: </span><span className="font-semibold text-gray-800">{savedProfile.address.city}</span></div>
-                        <div><span className="text-gray-400">State: </span><span className="font-semibold text-gray-800">{savedProfile.address.state}</span></div>
-                        <div><span className="text-gray-400">Pincode: </span><span className="font-semibold text-gray-800 font-mono">{savedProfile.address.pincode}</span></div>
                       </div>
                       <p className="text-[10px] text-emerald-600 font-semibold border-t border-gray-100 pt-1.5">
                         ✓ Auto-filled from your saved profile
@@ -675,9 +675,32 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <input
                     type="text"
+                    value={complaintLocation.state}
+                    onChange={(e) => setComplaintField('state', e.target.value)}
+                    placeholder="State *"
+                    className="px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
+                  />
+                  <input
+                    type="text"
+                    value={complaintLocation.city}
+                    onChange={(e) => setComplaintField('city', e.target.value)}
+                    placeholder="City / District *"
+                    className="px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
+                  />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={complaintLocation.pincode}
+                    onChange={(e) => setComplaintField('pincode', e.target.value.replace(/\D/g, ''))}
+                    placeholder="Pincode / ZIP *"
+                    className="px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
+                  />
+                  <input
+                    type="text"
                     value={complaintLocation.houseNo}
                     onChange={(e) => setComplaintField('houseNo', e.target.value)}
-                    placeholder="House / Flat No."
+                    placeholder="House / Flat / Building No. *"
                     className="px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
                   />
                   <input
@@ -691,33 +714,10 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                     type="text"
                     value={complaintLocation.street}
                     onChange={(e) => setComplaintField('street', e.target.value)}
-                    placeholder="Street / Road / Area / Landmark"
+                    placeholder="Street / Road / Landmark *"
                     className={`px-3 py-2 text-xs bg-white border rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500 ${
                       errors.complaintAddress ? 'border-red-400 bg-red-50/20' : 'border-gray-200'
                     }`}
-                  />
-                  <input
-                    type="text"
-                    value={complaintLocation.city}
-                    onChange={(e) => setComplaintField('city', e.target.value)}
-                    placeholder="City / District"
-                    className="px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
-                  />
-                  <input
-                    type="text"
-                    value={complaintLocation.state}
-                    onChange={(e) => setComplaintField('state', e.target.value)}
-                    placeholder="State"
-                    className="px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
-                  />
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={6}
-                    value={complaintLocation.pincode}
-                    onChange={(e) => setComplaintField('pincode', e.target.value.replace(/\D/g, ''))}
-                    placeholder="Pincode"
-                    className="px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
                   />
                 </div>
                 <div className="px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl text-gray-600 font-mono flex items-center justify-center">
