@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   X,
   Camera,
@@ -16,12 +16,18 @@ import {
   ArrowRight,
   FileCheck,
   RotateCcw,
+  User,
+  Home,
+  Navigation,
 } from 'lucide-react';
 import { GeminiTriageOutput, Grievance, MasterComplaint } from '@/lib/types';
+import { getSavedProfile, UserProfile } from '@/components/landing/UserProfileModal';
 
 interface SubmitComplaintModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Called after the modal opens so we can refresh profile data from localStorage */
+  onOpenProfileModal?: () => void;
   onSuccess?: (grievance: Grievance, masterTicket: MasterComplaint | null) => void;
 }
 
@@ -72,29 +78,44 @@ const SAMPLE_PRESETS = [
 export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
   isOpen,
   onClose,
+  onOpenProfileModal,
   onSuccess,
 }) => {
+  // ── Saved profile ──────────────────────────────────────────────────────────
+  const [savedProfile, setSavedProfile] = useState<UserProfile | null>(null);
+
+  // ── Complaint fields ───────────────────────────────────────────────────────
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [addressText, setAddressText] = useState('MG Road, Delhi');
-  const [latitude, setLatitude] = useState(28.6304);
-  const [longitude, setLongitude] = useState(77.2177);
-  const [citizenPhone, setCitizenPhone] = useState('+91 98765 43210');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
-  // Field validation errors
+  // ── Citizen identity (auto-filled from profile) ────────────────────────────
+  const [citizenName, setCitizenName] = useState('');
+  const [citizenPhone, setCitizenPhone] = useState('');
+
+  // ── User's own saved address (from profile) ────────────────────────────────
+  const [userAddress, setUserAddress] = useState('');
+
+  // ── Complaint location (where the issue actually is) ───────────────────────
+  const [complaintAddress, setComplaintAddress] = useState('');
+  const [latitude, setLatitude] = useState(28.6304);
+  const [longitude, setLongitude] = useState(77.2177);
+  const [detectingComplaintGps, setDetectingComplaintGps] = useState(false);
+
+  // ── Validation errors ──────────────────────────────────────────────────────
   const [errors, setErrors] = useState<{
     title?: string;
     description?: string;
     image?: string;
+    complaintAddress?: string;
   }>({});
 
-  // Voice recording state
+  // ── Voice recording state ──────────────────────────────────────────────────
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Submission & AI analysis state
+  // ── Submission & AI analysis state ────────────────────────────────────────
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisPhase, setAnalysisPhase] = useState('');
   const [result, setResult] = useState<{
@@ -108,11 +129,31 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
   const [isFinalSuccess, setIsFinalSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Reset form completely so next submission starts fresh
+  // ── Load saved profile whenever modal opens ────────────────────────────────
+  useEffect(() => {
+    if (isOpen) {
+      const profile = getSavedProfile();
+      setSavedProfile(profile);
+      if (profile) {
+        setCitizenName(profile.name);
+        setCitizenPhone(profile.phone);
+        setUserAddress(profile.savedAddress);
+      } else {
+        setCitizenName('');
+        setCitizenPhone('');
+        setUserAddress('');
+      }
+    }
+  }, [isOpen]);
+
+  // ── Reset complaint form (keeps profile data) ──────────────────────────────
   const handleResetForm = () => {
     setTitle('');
     setDescription('');
     setSelectedImage(null);
+    setComplaintAddress('');
+    setLatitude(28.6304);
+    setLongitude(77.2177);
     setErrors({});
     setErrorMsg(null);
     setResult(null);
@@ -121,33 +162,39 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
     if (timerRef.current) clearInterval(timerRef.current);
   };
 
-  // Close modal and reset
+  // ── Close modal and full reset ─────────────────────────────────────────────
   const handleCloseModal = () => {
     handleResetForm();
     onClose();
   };
 
-  // Simulate or execute Geolocation
-  const handleDetectLocation = () => {
+  // ── Detect GPS for complaint location ─────────────────────────────────────
+  const handleDetectComplaintLocation = () => {
+    setDetectingComplaintGps(true);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          setLatitude(Number(pos.coords.latitude.toFixed(4)));
-          setLongitude(Number(pos.coords.longitude.toFixed(4)));
-          setAddressText(
-            `Detected GPS: Lat ${pos.coords.latitude.toFixed(4)}, Long ${pos.coords.longitude.toFixed(4)}`
-          );
+          const lat = Number(pos.coords.latitude.toFixed(4));
+          const lng = Number(pos.coords.longitude.toFixed(4));
+          setLatitude(lat);
+          setLongitude(lng);
+          setComplaintAddress(`GPS Detected: Lat ${lat}, Long ${lng}`);
+          setDetectingComplaintGps(false);
+          setErrors((prev) => ({ ...prev, complaintAddress: undefined }));
         },
         () => {
           setLatitude(28.6304);
           setLongitude(77.2177);
-          setAddressText('MG Road, Delhi (Lat: 28.6304, Long: 77.2177)');
+          setComplaintAddress('MG Road, Delhi (Lat: 28.6304, Long: 77.2177)');
+          setDetectingComplaintGps(false);
         }
       );
+    } else {
+      setDetectingComplaintGps(false);
     }
   };
 
-  // Toggle voice simulation
+  // ── Voice note simulation ──────────────────────────────────────────────────
   const toggleRecording = () => {
     if (!isRecording) {
       setIsRecording(true);
@@ -159,7 +206,7 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
       // Simulate Speech-to-Text transcript
       setTimeout(() => {
         const sampleText =
-          'यहाँ एमजी रोड पर मेट्रो पिलर के सामने बहुत बड़ा गड्ढा है, गाड़ियां टकरा रही हैं। (There is a huge pothole causing accidents near metro pillar on MG Road.)';
+          'यहाँ एमजी रोड पर मेट्रो पिलर के सामने बहुत बड़ा गड्ढा है, गाड़ियां टकरा रही हैं। (There is a huge pothole causing accidents near metro pillar on MG Road.)';
         setDescription((prev) => (prev ? `${prev} ${sampleText}` : sampleText));
         if (!title) setTitle('Road pothole hazard reported via voice note');
         setErrors((prev) => ({ ...prev, description: undefined, title: undefined }));
@@ -170,11 +217,11 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
     }
   };
 
-  // Quick preset loader
-  const applyPreset = (preset: typeof SAMPLE_PRESETS[0]) => {
+  // ── Quick preset loader ────────────────────────────────────────────────────
+  const applyPreset = (preset: (typeof SAMPLE_PRESETS)[0]) => {
     setTitle(preset.title);
     setDescription(preset.desc);
-    setAddressText(preset.address);
+    setComplaintAddress(preset.address);
     setLatitude(preset.lat);
     setLongitude(preset.lng);
     setSelectedImage(preset.image);
@@ -182,7 +229,7 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
     setErrorMsg(null);
   };
 
-  // Handle file input
+  // ── Handle file input ──────────────────────────────────────────────────────
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -195,11 +242,16 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
     }
   };
 
-  // Submit to API with strict validation (* required fields)
+  // ── Submit to API ──────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const newErrors: { title?: string; description?: string; image?: string } = {};
+    const newErrors: {
+      title?: string;
+      description?: string;
+      image?: string;
+      complaintAddress?: string;
+    } = {};
 
     if (!title.trim()) {
       newErrors.title = 'Title is required. Please provide a headline.';
@@ -209,6 +261,9 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
     }
     if (!selectedImage) {
       newErrors.image = 'Photo evidence is required. Please upload or select an image.';
+    }
+    if (!complaintAddress.trim()) {
+      newErrors.complaintAddress = 'Please specify the location where the issue is occurring.';
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -241,9 +296,9 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
           imageBase64: selectedImage,
           latitude,
           longitude,
-          addressText,
-          citizenPhone,
-          citizenName: 'Citizen Reporter',
+          addressText: complaintAddress.trim(),
+          citizenPhone: citizenPhone || '+91 00000 00000',
+          citizenName: citizenName || 'Citizen Reporter',
         }),
       });
 
@@ -329,13 +384,92 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
             </div>
           )}
 
-          {/* STATE 1: INPUT FORM */}
+          {/* ═══════════════════════════════════════════════════════════════════
+              STATE 1: INPUT FORM
+          ═══════════════════════════════════════════════════════════════════ */}
           {!result && !isFinalSuccess && (
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Mandatory Notice */}
               <div className="text-[11px] text-gray-500 flex items-center gap-1">
                 Fields marked with <span className="text-red-500 font-bold text-sm leading-none">*</span> are mandatory.
               </div>
+
+              {/* ── CITIZEN IDENTITY (pre-filled from profile) ─────────────── */}
+              <div className="p-4 bg-slate-50 border border-gray-200 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-600 uppercase tracking-wider flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-orange-600" />
+                    Citizen Details
+                  </span>
+                  {!savedProfile && (
+                    <button
+                      type="button"
+                      onClick={onOpenProfileModal}
+                      className="text-[11px] text-orange-600 font-semibold hover:underline cursor-pointer"
+                    >
+                      + Set up profile to auto-fill
+                    </button>
+                  )}
+                  {savedProfile && (
+                    <button
+                      type="button"
+                      onClick={onOpenProfileModal}
+                      className="text-[11px] text-gray-400 font-semibold hover:text-orange-600 cursor-pointer"
+                    >
+                      ✏️ Edit Profile
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-gray-500 mb-1 uppercase tracking-wider">
+                      Your Name
+                    </label>
+                    <input
+                      type="text"
+                      value={citizenName}
+                      onChange={(e) => setCitizenName(e.target.value)}
+                      placeholder="Full name"
+                      className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-gray-500 mb-1 uppercase tracking-wider">
+                      Mobile Number
+                    </label>
+                    <input
+                      type="tel"
+                      value={citizenPhone}
+                      onChange={(e) => setCitizenPhone(e.target.value)}
+                      placeholder="+91 98765 43210"
+                      className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+                    />
+                  </div>
+                </div>
+
+                {/* User's Saved Home Address */}
+                <div>
+                  <label className="block text-[10px] font-semibold text-gray-500 mb-1 uppercase tracking-wider flex items-center gap-1">
+                    <Home className="w-3 h-3" />
+                    Your Home / Office Address
+                    <span className="text-gray-400 font-normal">(optional, for officer contact)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={userAddress}
+                    onChange={(e) => setUserAddress(e.target.value)}
+                    placeholder="e.g., 42-B, Lajpat Nagar, New Delhi"
+                    className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+                  />
+                  {savedProfile && (
+                    <p className="text-[10px] text-emerald-600 font-semibold mt-1">
+                      ✓ Auto-filled from your saved profile
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* ── COMPLAINT DETAILS ──────────────────────────────────────── */}
 
               {/* Title Field */}
               <div className="space-y-1">
@@ -457,34 +591,49 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                 )}
               </div>
 
-              {/* Location Field */}
+              {/* ── COMPLAINT LOCATION (where the issue is) ───────────────── */}
               <div className="space-y-2 pt-2 border-t border-gray-100">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-orange-600" />
-                    Complaint Location (PostGIS 50m Index)
+                    <Navigation className="w-3.5 h-3.5 text-orange-600" />
+                    Issue Location <span className="text-red-500 font-bold">*</span>
+                    <span className="text-gray-400 font-normal text-[10px] normal-case tracking-normal">
+                      (where the problem is)
+                    </span>
                   </label>
                   <button
                     type="button"
-                    onClick={handleDetectLocation}
-                    className="text-xs font-semibold text-orange-600 hover:text-orange-700 flex items-center gap-1 cursor-pointer"
+                    onClick={handleDetectComplaintLocation}
+                    disabled={detectingComplaintGps}
+                    className="text-xs font-semibold text-orange-600 hover:text-orange-700 flex items-center gap-1 cursor-pointer disabled:opacity-50"
                   >
-                    <RefreshCw className="w-3 h-3" />
-                    Auto-Detect GPS
+                    <RefreshCw
+                      className={`w-3 h-3 ${detectingComplaintGps ? 'animate-spin' : ''}`}
+                    />
+                    {detectingComplaintGps ? 'Detecting GPS…' : 'Use My GPS'}
                   </button>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <input
                     type="text"
-                    value={addressText}
-                    onChange={(e) => setAddressText(e.target.value)}
-                    placeholder="Address / Landmark"
-                    className="sm:col-span-2 px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500"
+                    value={complaintAddress}
+                    onChange={(e) => {
+                      setComplaintAddress(e.target.value);
+                      if (e.target.value.trim())
+                        setErrors((prev) => ({ ...prev, complaintAddress: undefined }));
+                    }}
+                    placeholder="Address / Landmark where the issue is"
+                    className={`sm:col-span-2 px-3 py-2 text-xs bg-white border rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-500 ${
+                      errors.complaintAddress ? 'border-red-400 bg-red-50/20' : 'border-gray-200'
+                    }`}
                   />
                   <div className="px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl text-gray-600 font-mono flex items-center justify-center">
                     {latitude}, {longitude}
                   </div>
                 </div>
+                {errors.complaintAddress && (
+                  <p className="text-[11px] text-red-600 font-semibold">{errors.complaintAddress}</p>
+                )}
               </div>
 
               {/* Modal Actions */}
@@ -517,7 +666,9 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
             </form>
           )}
 
-          {/* STATE 2: AI TRIAGE & MASTER CLUSTER OUTPUT VIEW */}
+          {/* ═══════════════════════════════════════════════════════════════════
+              STATE 2: AI TRIAGE & MASTER CLUSTER OUTPUT VIEW
+          ═══════════════════════════════════════════════════════════════════ */}
           {result && !isFinalSuccess && (
             <div className="space-y-5 animate-in fade-in duration-300">
               {/* Header Banner */}
@@ -585,18 +736,12 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                     <span className="text-[10px] text-gray-400 block font-semibold">
                       Department
                     </span>
-                    <span className="font-bold text-gray-900">
-                      {result.triage.department}
-                    </span>
+                    <span className="font-bold text-gray-900">{result.triage.department}</span>
                   </div>
 
                   <div className="p-2.5 bg-white rounded-xl border border-gray-100">
-                    <span className="text-[10px] text-gray-400 block font-semibold">
-                      Category
-                    </span>
-                    <span className="font-bold text-gray-900">
-                      {result.triage.category}
-                    </span>
+                    <span className="text-[10px] text-gray-400 block font-semibold">Category</span>
+                    <span className="font-bold text-gray-900">{result.triage.category}</span>
                   </div>
 
                   <div className="p-2.5 bg-white rounded-xl border border-gray-100">
@@ -649,7 +794,9 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
             </div>
           )}
 
-          {/* STATE 3: FINAL SUCCESS CONFIRMATION ON THE SAME SCREEN */}
+          {/* ═══════════════════════════════════════════════════════════════════
+              STATE 3: FINAL SUCCESS CONFIRMATION ON THE SAME SCREEN
+          ═══════════════════════════════════════════════════════════════════ */}
           {isFinalSuccess && result && (
             <div className="text-center py-8 px-4 space-y-6 animate-in zoom-in-95 duration-200">
               {/* Celebratory Check Icon */}
@@ -665,7 +812,8 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                   🎉 Complaint Submitted Successfully!
                 </h3>
                 <p className="text-xs sm:text-sm text-gray-600 max-w-md mx-auto leading-relaxed">
-                  Your grievance has been officially registered in the municipal portal. Department field officers have been notified for immediate inspection.
+                  Your grievance has been officially registered in the municipal portal. Department
+                  field officers have been notified for immediate inspection.
                 </p>
               </div>
 
@@ -688,6 +836,13 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                     </span>
                   </div>
 
+                  {citizenName && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500 font-medium">Filed By:</span>
+                      <span className="font-bold text-gray-900 text-right">{citizenName}</span>
+                    </div>
+                  )}
+
                   <div className="flex justify-between">
                     <span className="text-gray-500 font-medium">Assigned Department:</span>
                     <span className="font-bold text-gray-900 text-right">
@@ -697,9 +852,7 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
 
                   <div className="flex justify-between">
                     <span className="text-gray-500 font-medium">Category:</span>
-                    <span className="font-bold text-gray-900">
-                      {result.triage.category}
-                    </span>
+                    <span className="font-bold text-gray-900">{result.triage.category}</span>
                   </div>
 
                   <div className="flex justify-between">
@@ -710,7 +863,7 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                   </div>
 
                   <div className="flex justify-between">
-                    <span className="text-gray-500 font-medium">Location:</span>
+                    <span className="text-gray-500 font-medium">Issue Location:</span>
                     <span className="font-bold text-gray-900 max-w-[220px] truncate text-right">
                       {result.grievance.addressText}
                     </span>
@@ -757,9 +910,7 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
                 <span className="text-sm font-bold text-white block">
                   Processing Multimodal Triage
                 </span>
-                <span className="text-xs text-orange-400 font-mono">
-                  {analysisPhase}
-                </span>
+                <span className="text-xs text-orange-400 font-mono">{analysisPhase}</span>
               </div>
             </div>
           )}
