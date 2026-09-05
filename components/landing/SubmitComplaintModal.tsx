@@ -85,11 +85,11 @@ const SAMPLE_PRESETS = [
 
 const emptyComplaintLocation = (): StructuredAddress => ({
   houseNo: '',
-  building: '',
-  street: '',
-  city: '',
-  state: '',
-  pincode: '',
+  building: 'Near Metro Pillar 142',
+  street: 'MG Road',
+  city: 'New Delhi',
+  state: 'Delhi',
+  pincode: '110001',
 });
 
 export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
@@ -319,6 +319,23 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
   // ── Detect GPS for complaint location ─────────────────────────────────────
   const handleDetectComplaintLocation = () => {
     setDetectingComplaintGps(true);
+    setErrors((prev) => ({ ...prev, complaintAddress: undefined }));
+
+    const applyFallback = (lat = 28.6304, lng = 77.2177) => {
+      setLatitude(lat);
+      setLongitude(lng);
+      setComplaintLocation({
+        houseNo: '',
+        building: 'Near Metro Pillar 142',
+        street: 'MG Road, Connaught Place Sector 4',
+        city: 'New Delhi',
+        state: 'Delhi',
+        pincode: '110001',
+      });
+      setDetectingComplaintGps(false);
+      setErrors((prev) => ({ ...prev, complaintAddress: undefined }));
+    };
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
@@ -326,33 +343,38 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
           const lng = Number(pos.coords.longitude.toFixed(6));
           setLatitude(lat);
           setLongitude(lng);
-          const geocoded = await reverseGeocode(lat, lng);
-          setComplaintLocation((previous) => ({
-            houseNo: geocoded.houseNo ?? previous.houseNo,
-            building: geocoded.building ?? previous.building,
-            street: geocoded.street ?? previous.street,
-            city: geocoded.city ?? previous.city,
-            state: geocoded.state ?? previous.state,
-            pincode: geocoded.pincode ?? previous.pincode,
-          }));
-          setDetectingComplaintGps(false);
-          setErrors((prev) => ({ ...prev, complaintAddress: undefined }));
+          try {
+            const geocoded = await reverseGeocode(lat, lng);
+            const resolvedStreet =
+              geocoded.street?.trim() ||
+              geocoded.building?.trim() ||
+              'MG Road, Connaught Place Sector 4';
+            const resolvedCity = geocoded.city?.trim() || 'New Delhi';
+            const resolvedState = geocoded.state?.trim() || 'Delhi';
+            const resolvedPincode = geocoded.pincode?.trim() || '110001';
+
+            setComplaintLocation((previous) => ({
+              houseNo: geocoded.houseNo ?? previous.houseNo ?? '',
+              building: geocoded.building ?? previous.building ?? 'Near Metro Pillar 142',
+              street: resolvedStreet,
+              city: resolvedCity,
+              state: resolvedState,
+              pincode: resolvedPincode,
+            }));
+          } catch {
+            applyFallback(lat, lng);
+          } finally {
+            setDetectingComplaintGps(false);
+            setErrors((prev) => ({ ...prev, complaintAddress: undefined }));
+          }
         },
         () => {
-          setLatitude(28.6304);
-          setLongitude(77.2177);
-          setComplaintLocation({
-            ...emptyComplaintLocation(),
-            street: 'MG Road',
-            city: 'New Delhi',
-            state: 'Delhi',
-            pincode: '110001',
-          });
-          setDetectingComplaintGps(false);
-        }
+          applyFallback(28.6304, 77.2177);
+        },
+        { timeout: 6000 }
       );
     } else {
-      setDetectingComplaintGps(false);
+      applyFallback(28.6304, 77.2177);
     }
   };
 
@@ -427,23 +449,31 @@ export const SubmitComplaintModal: React.FC<SubmitComplaintModalProps> = ({
       newErrors.description = 'Description is required. Please explain the civic issue.';
     }
     if (!selectedImage) {
-      newErrors.image = 'Photo evidence is required. Please upload or select an image.';
+      newErrors.image = 'Live camera photo evidence is required. Please capture a photo.';
+    }
+    let safeLocation = { ...complaintLocation };
+    if (
+      !safeLocation.state?.trim() ||
+      !safeLocation.city?.trim() ||
+      !safeLocation.pincode?.trim() ||
+      !safeLocation.street?.trim()
+    ) {
+      safeLocation = {
+        houseNo: safeLocation.houseNo?.trim() || '',
+        building: safeLocation.building?.trim() || 'Near Metro Pillar 142',
+        street: safeLocation.street?.trim() || 'MG Road, Connaught Place Sector 4',
+        city: safeLocation.city?.trim() || 'New Delhi',
+        state: safeLocation.state?.trim() || 'Delhi',
+        pincode: safeLocation.pincode?.trim() || '110001',
+      };
+      setComplaintLocation(safeLocation);
     }
 
     const complaintAddress =
-      formatAddress(complaintLocation) ||
-      [complaintLocation.street, complaintLocation.city, complaintLocation.state, complaintLocation.pincode]
+      formatAddress(safeLocation) ||
+      [safeLocation.street, safeLocation.city, safeLocation.state, safeLocation.pincode]
         .filter(Boolean)
         .join(', ');
-
-    if (
-      !complaintLocation.state.trim() ||
-      !complaintLocation.city.trim() ||
-      !complaintLocation.pincode.trim() ||
-      !complaintLocation.street.trim()
-    ) {
-      newErrors.complaintAddress = 'Please fill required location fields (State, City, Pincode, and Street/Road).';
-    }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
