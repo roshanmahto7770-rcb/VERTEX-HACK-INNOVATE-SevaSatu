@@ -344,9 +344,17 @@ class MockDatabase {
   }
 
   public getGrievanceById(id: string): Grievance | undefined {
-    return this.grievances.find(
-      (g) => g.id.toLowerCase() === id.toLowerCase() || g.ticketNumber.toLowerCase() === id.toLowerCase()
-    );
+    if (!id) return undefined;
+    const clean = id.toLowerCase().replace(/^[#c\-_]+/, '');
+    return this.grievances.find((g) => {
+      const gTicketClean = g.ticketNumber.toLowerCase().replace(/^[#c\-_]+/, '');
+      return (
+        g.id.toLowerCase() === id.toLowerCase() ||
+        g.ticketNumber.toLowerCase() === id.toLowerCase() ||
+        g.ticketNumber.toLowerCase().replace(/^#/, '') === id.toLowerCase().replace(/^#/, '') ||
+        (clean.length >= 3 && gTicketClean === clean)
+      );
+    });
   }
 
   public getAllMasterComplaints(): MasterComplaint[] {
@@ -354,9 +362,16 @@ class MockDatabase {
   }
 
   public getMasterComplaintById(id: string): MasterComplaint | undefined {
-    return this.masterComplaints.find(
-      (m) => m.id === id || m.masterTicketNumber.toLowerCase() === id.toLowerCase()
-    );
+    if (!id) return undefined;
+    const clean = id.toLowerCase().replace(/^[mst\-_]+/, '');
+    return this.masterComplaints.find((m) => {
+      const mTicketClean = m.masterTicketNumber.toLowerCase().replace(/^[mst\-_]+/, '');
+      return (
+        m.id.toLowerCase() === id.toLowerCase() ||
+        m.masterTicketNumber.toLowerCase() === id.toLowerCase() ||
+        (clean.length >= 3 && mTicketClean === clean)
+      );
+    });
   }
 
   public addGrievance(grievance: Grievance): void {

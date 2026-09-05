@@ -52,36 +52,54 @@ export function getSavedProfile(): UserProfile | null {
   }
 }
 
-/** Persist profile to localStorage */
+/** Persist profile to localStorage and sync with backend */
 export function saveProfile(profile: UserProfile): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+
+  // Background sync to backend database
+  fetch('/api/citizen/profile', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: profile.name,
+      phone: profile.phone,
+      address: profile.address,
+      savedLat: profile.savedLat,
+      savedLng: profile.savedLng,
+    }),
+  }).catch(() => {
+    // Graceful offline degradation
+  });
 }
 
-// ── Nominatim reverse-geocode → StructuredAddress ─────────────────────────────
+// ── Backend + OSM reverse-geocode → StructuredAddress ────────────────────────
 export async function reverseGeocode(lat: number, lng: number): Promise<Partial<StructuredAddress>> {
   try {
+    // 1. Try internal Next.js backend API first
+    const backendRes = await fetch(`/api/location/reverse-geocode?lat=${lat}&lng=${lng}`);
+    if (backendRes.ok) {
+      const data = await backendRes.json();
+      if (data.success && data.address) {
+        return data.address;
+      }
+    }
+
+    // 2. Direct OpenStreetMap Nominatim fallback
     const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;
     const res = await fetch(url, {
-      headers: { 'Accept-Language': 'en', 'User-Agent': 'SevaSetu-GovPortal/1.0' },
+      headers: { 'Accept-Language': 'en', 'User-Agent': 'SevaSetu-GovPortal/2.0' },
     });
     if (!res.ok) return {};
     const json = await res.json();
     const a = json.address ?? {};
 
     return {
-      // House number from OSM (may be absent)
       houseNo: a.house_number ?? '',
-      // Building / Society / Colony
       building: a.building ?? a.amenity ?? a.neighbourhood ?? a.suburb ?? '',
-      // Street / Road
       street: a.road ?? a.pedestrian ?? a.footway ?? a.path ?? '',
-      // City / District / Town / Village
-      city:
-        a.city ?? a.town ?? a.village ?? a.district ?? a.county ?? '',
-      // State
+      city: a.city ?? a.town ?? a.village ?? a.district ?? a.county ?? '',
       state: a.state ?? '',
-      // Pincode
       pincode: a.postcode ?? '',
     };
   } catch {
